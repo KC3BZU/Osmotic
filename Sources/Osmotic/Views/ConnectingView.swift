@@ -58,7 +58,7 @@ struct ConnectingView: View {
             .raisedPanel(screws: true)
 
             if model.needsApproval && model.connectError == nil {
-                ApprovalCallout()
+                ApprovalCallout(isDrone: model.target?.model.isDrone == true)
                     .transition(.panelFromTop)
             }
 
@@ -224,6 +224,7 @@ private struct StageChannel: View {
 
 /// The one step only the user can do.
 private struct ApprovalCallout: View {
+    var isDrone = false
     var body: some View {
         HStack(spacing: Theme.s3) {
             Image(systemName: "hand.tap.fill")
@@ -237,10 +238,12 @@ private struct ApprovalCallout: View {
                 }
                 .shadow(Depth.contact)
             VStack(alignment: .leading, spacing: 3) {
-                Text("Approve the connection on the camera")
+                Text(isDrone ? "Approve the connection on the drone" : "Approve the connection on the camera")
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(Theme.ink)
-                Text("A pairing request shows up on its screen: tap the check mark. Only needed the first time.")
+                Text(isDrone
+                     ? "Hold the Avata 2 power button for two seconds to approve. Only needed the first time."
+                     : "A pairing request shows up on its screen: tap the check mark. Only needed the first time.")
                     .font(.callout)
                     .foregroundStyle(Theme.muted)
                     .fixedSize(horizontal: false, vertical: true)

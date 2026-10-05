@@ -21,6 +21,16 @@
         }
       }
     },
+    "%@ is plugged in, but its card isn’t showing up. Unplug the cable and plug it back in, or pick USB storage on the camera.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ está enchufada, pero su tarjeta no aparece. Desenchufá el cable y volvé a enchufarlo, o elegí almacenamiento USB en la cámara."
+          }
+        }
+      }
+    },
     "%@/s": {
       "localizations": {
         "es": {
@@ -257,6 +267,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Aprobá la conexión en la pantalla de la cámara"
+          }
+        }
+      }
+    },
+    "Approve the connection on the drone": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aprobá la conexión en el dron"
           }
         }
       }
@@ -1137,6 +1157,16 @@
         }
       }
     },
+    "Hold the Avata 2 power button for two seconds to approve. Only needed the first time.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mantené presionado el botón de encendido del Avata 2 por dos segundos para aprobar. Solo hace falta la primera vez."
+          }
+        }
+      }
+    },
     "Hyperlapse": {
       "localizations": {
         "es": {
@@ -1696,6 +1726,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Osmotic %@ está disponible."
+          }
+        }
+      }
+    },
+    "Osmotic Avata": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Osmotic Avata"
           }
         }
       }
@@ -3005,16 +3045,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "· guardada"
-          }
-        }
-      }
-    },
-    "%@ is plugged in, but its card isn’t showing up. Unplug the cable and plug it back in, or pick USB storage on the camera.": {
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ está enchufada, pero su tarjeta no aparece. Desenchufá el cable y volvé a enchufarlo, o elegí almacenamiento USB en la cámara."
           }
         }
       }

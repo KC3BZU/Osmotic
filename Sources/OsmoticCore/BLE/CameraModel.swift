@@ -18,7 +18,7 @@ public enum BleConstants {
         0x0006: "OsmoAction", 0x0010: "OsmoAction2", 0x0012: "OsmoAction3", 0x0014: "OsmoAction4",
         0x0015: "OsmoAction5Pro", 0x0017: "Osmo360", 0x0018: "OsmoAction6", 0x0019: "OsmoNano",
         0x0020: "OsmoPocket3", 0x0021: "OsmoPocket4", 0x0022: "OsmoPocket4Pro",
-        0x0070: "Mavic3", 0x007e: "Neo2",
+        0x0070: "Mavic3", 0x0077: "Avata2", 0x007e: "Neo2",
     ]
 }
 
@@ -98,6 +98,10 @@ public struct CameraModel: Sendable, Equatable {
     /// The Pocket 3 has exactly one store, its microSD, always served at `/v2?storage=0`.
     public var singleSdStorage = false
     public var isDrone = false
+    public var supportsDroneMedia = false
+    public var supportsMediaTransfer: Bool { !isDrone || supportsDroneMedia }
+    public var supportsCaptureControl: Bool { !isDrone && supportsLive }
+    public var pairingToken: String { isDrone ? OsmoCommands.dronePairingToken : OsmoCommands.cameraPairingToken }
 
     /// The Live tab's commands (capture control, live view) are the Pocket 3's — Kaze for DJI tested
     /// them on one; other bodies would get untested writes.
@@ -105,7 +109,7 @@ public struct CameraModel: Sendable, Equatable {
 
     public init(
         name: String, datalinkPort: UInt16 = 9004, tcpPoke: Bool = true, wpa3: Bool = false,
-        verified: Bool = false, singleSdStorage: Bool = false, isDrone: Bool = false
+        verified: Bool = false, singleSdStorage: Bool = false, isDrone: Bool = false, supportsDroneMedia: Bool = false
     ) {
         self.name = name
         self.datalinkPort = datalinkPort
@@ -114,6 +118,7 @@ public struct CameraModel: Sendable, Equatable {
         self.verified = verified
         self.singleSdStorage = singleSdStorage
         self.isDrone = isDrone
+        self.supportsDroneMedia = supportsDroneMedia
     }
 
     /// The other datalink config to try when the handshake never lands.
@@ -139,6 +144,7 @@ public struct CameraModel: Sendable, Equatable {
         0x0021: CameraModel(name: "Osmo Pocket 4", verified: true),
         0x0022: CameraModel(name: "Osmo Pocket 4 Pro", verified: true),
         0x0070: CameraModel(name: "Mavic 3", datalinkPort: 9003, tcpPoke: false, verified: true, isDrone: true),
+        0x0077: CameraModel(name: "DJI Avata 2", datalinkPort: 9003, tcpPoke: false, isDrone: true, supportsDroneMedia: true),
         0x007e: CameraModel(name: "DJI Neo 2", datalinkPort: 9003, tcpPoke: false, isDrone: true),
     ]
 

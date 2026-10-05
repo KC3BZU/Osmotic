@@ -27,6 +27,7 @@ public enum OsmoCommands {
 
     /// The pairing token a camera expects. (Drones want "DJI FLY"; this app targets cameras.)
     public static let cameraPairingToken = "osmo"
+    public static let dronePairingToken = "DJI FLY"
 
     public static let sessionWake: [UInt8] = [0x04, 0x00]
     public static let sessionKeepalive: [UInt8] = [0x01, 0x01]

@@ -32,7 +32,7 @@ extension AppModel {
         screen = .connecting
         ble.stopScan()
         LocalNetworkPermission.prime()
-        log("=== connect \(t.name) [\(t.model.name)] port=\(t.model.datalinkPort) poke=\(t.model.tcpPoke) ===")
+        log("connect: model=\(t.model.name) port=\(t.model.datalinkPort) poke=\(t.model.tcpPoke)")
         connectGeneration += 1
         let gen = connectGeneration
         let previous = connectTask
@@ -179,7 +179,9 @@ extension AppModel {
                     )
                     : String(localized: "The Mac’s Bluetooth is off."))
         }
-        let flow = PairingFlow(bleName: t.name, savedPassword: SavedCameraStore.password(for: t.id))
+        let flow = PairingFlow(
+            bleName: t.name, savedPassword: SavedCameraStore.password(for: t.id),
+            identifier: Preferences.pairingIdentifier, token: t.model.pairingToken)
         self.flow = flow
         flow.log = { log($0) }
         flow.write = { [weak self] in self?.ble.write($0) }

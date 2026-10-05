@@ -119,7 +119,7 @@ final class BluetoothService: NSObject {
         accumulator = DumlFrameAccumulator()
         writeQueue.removeAll()
         armed = false
-        log("BLE: connecting to \(p.name ?? id.uuidString)…")
+        log("BLE: connecting to selected device")
         central.connect(p, options: nil)
         return true
     }
@@ -225,11 +225,11 @@ extension BluetoothService: @preconcurrency CBCentralManagerDelegate {
         let brand = Brand.of(name: name, manufacturerPayload: payload, djiCompanyId: djiCid)
         guard brand != .unknown || modelId != nil else { others += 1; return }
         let model = CameraModel.resolve(modelId: modelId, name: name, brand: brand)
-        guard !model.isDrone else { return }  // this app offloads cameras only
+        guard model.supportsMediaTransfer else { others += 1; return }
         let id = peripheral.identifier
         let rssi = RSSI.intValue == 127 ? (cameras[id]?.rssi ?? -80) : RSSI.intValue
         if cameras[id] == nil {
-            log("BLE: found \(name ?? "?") model=\(model.name)\(payload.map { " mfr=\($0.hexString)" } ?? "") rssi=\(rssi)")
+            log("BLE: found model=\(model.name) id=\(modelId.map { String($0, radix: 16) } ?? "unknown") rssi=\(rssi)")
         }
         seenAt[id] = Date()
         let seen = DiscoveredCamera(

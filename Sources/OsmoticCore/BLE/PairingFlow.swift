@@ -32,6 +32,8 @@ public final class PairingFlow {
     /// Read only if the camera doesn't hand its password over BLE (it lives in the Keychain).
     private let savedPassword: () -> String?
     private let identifier: String
+    private let token: String
+    private var cancelled = false
     private var generation = 0
     private var pairReplyStatus: Int?
     private var approvalShown = false
@@ -43,15 +45,16 @@ public final class PairingFlow {
 
     public init(
         bleName: String, savedPassword: @autoclosure @escaping () -> String?,
-        identifier: String = OsmoCommands.defaultIdentifier
+        identifier: String = OsmoCommands.defaultIdentifier, token: String = OsmoCommands.cameraPairingToken
     ) {
         self.ssid = bleName
         self.savedPassword = savedPassword
         self.identifier = identifier
+        self.token = token
     }
 
     /// Stop acting on any pending timers (disconnect / cancel).
-    public func cancel() { generation += 1 }
+    public func cancel() { generation += 1; cancelled = true }
 
     private func after(_ delay: TimeInterval, _ body: @escaping () -> Void) {
         let gen = generation
@@ -63,22 +66,24 @@ public final class PairingFlow {
 
     /// GATT is armed (notifications on, `01 00` written to fff4).
     public func onReady() {
+        guard !cancelled else { return }
         write(OsmoCommands.sessionPing(OsmoCommands.sessionWake))
         log("BLE: sent session wake 0x00/0x2b [04 00]")
         after(0.12) { [self] in
-            write(OsmoCommands.setPairingPin(identifier: identifier))
-            log("BLE: sent SetPairingPIN (token \"osmo\")")
+            write(OsmoCommands.setPairingPin(token, identifier: identifier))
+            log("BLE: sent SetPairingPIN (\(token == OsmoCommands.dronePairingToken ? "drone" : "camera") profile)")
         }
         for delay in [2.5, 5.0, 8.0] {
             after(delay) { [self] in
                 guard pairReplyStatus == nil, !credsRequested else { return }
                 log("BLE: no pairing reply yet — re-sending SetPairingPIN")
-                write(OsmoCommands.setPairingPin(identifier: identifier))
+                write(OsmoCommands.setPairingPin(token, identifier: identifier))
             }
         }
     }
 
     public func onMessage(_ m: DjiMessage) {
+        guard !cancelled else { return }
         if m.flags == 0x40 {
             write(OsmoCommands.response(to: m))
             if m.cmdSet == 0x07 && m.cmdId == 0x46 {
@@ -110,13 +115,15 @@ public final class PairingFlow {
                 log("BLE: pairing approved (0x07/0x46)")
                 onPaired()
             case 0x07:
+                guard credsRequested else { return }
                 if let s = OsmoCommands.parseStatusPackString(p), !s.isEmpty {
                     ssid = s
                     ssidKnown = true
-                    log("BLE: camera Wi-Fi SSID = \"\(s)\"")
+                    log("BLE: Wi-Fi SSID received (\(s.utf8.count) bytes)")
                     if let password { deliver(password) }
                 }
             case 0x0E:
+                guard credsRequested else { return }
                 if let pass = OsmoCommands.parseStatusPackString(p), !pass.isEmpty {
                     password = pass
                     log("BLE: Wi-Fi password received over BLE (\(pass.count) chars)")
@@ -127,7 +134,7 @@ public final class PairingFlow {
                         // (the AP is normally named after it) only if it still doesn't come.
                         write(OsmoCommands.wifiQuery(0x07, id: 0x8007))
                         after(2.0) { [self] in
-                            if !delivered { log("BLE: no SSID reply — using the Bluetooth name \"\(ssid)\"") }
+                            if !delivered { log("BLE: no SSID reply; using the Bluetooth name") }
                             deliver(pass)
                         }
                     }
@@ -188,5 +195,8 @@ public final class PairingFlow {
     }
 
     /// The user typed the password after `.needsPassword`.
-    public func providePassword(_ pass: String) { deliver(pass) }
+    public func providePassword(_ pass: String) {
+        guard !cancelled, credsRequested else { return }
+        deliver(pass)
+    }
 }
