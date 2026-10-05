@@ -3,6 +3,9 @@ import Foundation
 /// One media item on the camera, as decoded from the CompositePack manifest.
 public struct CameraFile: Sendable, Hashable, Identifiable {
     /// e.g. `DCIM/DJI_001/DJI_20260329115359_0211_D.MP4`
+    public var address: MediaAddress = .path
+    public var deviceIdentity: String = ""
+    public var recordCaptureDate: Date?
     public var path: String
     /// e.g. `MISC/THM/DJI_001/DJI_20260329115359_0211_D.scr`
     public var thumbPath: String
@@ -52,7 +55,12 @@ public struct CameraFile: Sendable, Hashable, Identifiable {
         self.handleCandidate = handleCandidate
     }
 
-    public var id: String { "\(storage):\(path)" }
+    public var id: String {
+        if case .drone(let index, let segment) = address { return "\(deviceIdentity):\(storage):\(index):\(segment)" }
+        return "\(storage):\(path)"
+    }
+
+    public var downloadIdentity: String { "\(id)|\(recordCaptureDate?.timeIntervalSince1970 ?? 0)|\(sizeBytes)" }
 
     public var name: String { path.split(separator: "/").last.map(String.init) ?? path }
 
@@ -107,6 +115,7 @@ public struct CameraFile: Sendable, Hashable, Identifiable {
 
     /// Capture date from the filename stamp (camera local time).
     public var captureDate: Date? {
+        if let recordCaptureDate { return recordCaptureDate }
         let t = timestamp
         guard t.count == 14 else { return nil }
         var c = DateComponents()
@@ -134,7 +143,7 @@ public struct CameraFile: Sendable, Hashable, Identifiable {
     public var isBurst: Bool { name.firstMatch(of: /^(.+)_\d{3}\.\w+$/) != nil }
 
     public var opHandle: Int { handle }
-    public var deletable: Bool { opHandle != 0 && !handleShared }
+    public var deletable: Bool { address == .path && opHandle != 0 && !handleShared }
 
     // ---- HTTP addressing (`/v2?storage=N&path=…`) ----------------------------------------------
 
@@ -142,11 +151,22 @@ public struct CameraFile: Sendable, Hashable, Identifiable {
         "/v2?storage=\(storage)&path=\(path)"
     }
 
-    public var originalURLPath: String { Self.urlPath(storage: storage, path: path) }
-    public var thumbURLPath: String { Self.urlPath(storage: storage, path: thumbPath) }
+    public var originalURLPath: String {
+        if case .drone(let index, let segment) = address {
+            return "/v1?file_index=\(index)&file_subtype=0&file_seg_subindex=\(segment)"
+        }
+        return Self.urlPath(storage: storage, path: path)
+    }
+    public var thumbURLPath: String {
+        if case .drone(let index, let segment) = address {
+            return "/v1?file_index=\(index)&file_subtype=1&file_seg_subindex=\(segment)"
+        }
+        return Self.urlPath(storage: storage, path: thumbPath)
+    }
 
     /// Preview candidates, cheapest first: listed proxy, derived proxy for the family, then original.
     public var previewURLPaths: [String] {
+        if case .drone = address { return [originalURLPath] }
         var urls: [String] = []
         func add(_ s: String) { if !urls.contains(s) { urls.append(s) } }
         if let proxyPath { add(Self.urlPath(storage: storage, path: proxyPath)) }
@@ -159,6 +179,7 @@ public struct CameraFile: Sendable, Hashable, Identifiable {
 
     /// The unlisted companion that might sit beside this file: `.DNG` for a JPEG, `.WAV` for a clip.
     public func sidecarCandidate() -> CameraFile? {
+        if case .drone = address { return nil }
         let kind: String
         switch ext {
         case "JPG", "JPEG": kind = "DNG"
