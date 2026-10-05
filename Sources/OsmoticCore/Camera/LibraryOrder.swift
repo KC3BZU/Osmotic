@@ -5,13 +5,19 @@ extension Array where Element == CameraFile {
     /// Newest first: the name's capture stamp descending, then its sequence number descending. Files
     /// that tie on both (names without a stamp) keep the order they come in.
     public func newestFirst() -> [CameraFile] {
-        sorted { $0.timestamp != $1.timestamp ? $0.timestamp > $1.timestamp : $0.seq > $1.seq }
+        sorted {
+            if $0.recordCaptureDate != nil || $1.recordCaptureDate != nil { return ($0.captureDate ?? .distantPast) > ($1.captureDate ?? .distantPast) }
+            return $0.timestamp != $1.timestamp ? $0.timestamp > $1.timestamp : $0.seq > $1.seq
+        }
     }
 
     /// Oldest first (the download queue's order): stamp ascending, then sequence number ascending.
     /// Ties again keep the order they come in.
     public func oldestFirst() -> [CameraFile] {
-        sorted { $0.timestamp != $1.timestamp ? $0.timestamp < $1.timestamp : $0.seq < $1.seq }
+        sorted {
+            if $0.recordCaptureDate != nil || $1.recordCaptureDate != nil { return ($0.captureDate ?? .distantPast) < ($1.captureDate ?? .distantPast) }
+            return $0.timestamp != $1.timestamp ? $0.timestamp < $1.timestamp : $0.seq < $1.seq
+        }
     }
 
     /// Fold a freshly listed `page` into this library. `added`: the page's files whose `id` isn't in

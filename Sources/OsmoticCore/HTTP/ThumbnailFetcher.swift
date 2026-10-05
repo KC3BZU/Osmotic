@@ -21,7 +21,7 @@ public actor ThumbnailFetcher {
 
     /// The disk-cache key: the path plus size, so a reused file number never shows a stale image.
     nonisolated func cacheURL(for file: CameraFile) -> URL {
-        let key = "\(file.path)|\(file.sizeBytes)"
+        let key = file.address == .path ? "\(file.path)|\(file.sizeBytes)" : file.downloadIdentity
         var hash: UInt64 = 0xcbf2_9ce4_8422_2325
         for b in key.utf8 { hash = (hash ^ UInt64(b)) &* 0x0000_0100_0000_01b3 }
         return cacheDir.appendingPathComponent(String(hash, radix: 16) + ".img")

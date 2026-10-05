@@ -44,6 +44,7 @@ public final class FileDownloader: NSObject, URLSessionDataDelegate, @unchecked 
 
     private final class TaskState {
         let handle: FileHandle
+        let requiresTotal: Bool
         let rangeStart: Int
         var written: Int
         var outcome: Attempt?
@@ -54,9 +55,10 @@ public final class FileDownloader: NSObject, URLSessionDataDelegate, @unchecked 
         var lastReport = Date.distantPast
 
         init(
-            handle: FileHandle, rangeStart: Int, progress: @escaping (Int) -> Void, onTotal: ((Int) -> Void)?,
+            handle: FileHandle, rangeStart: Int, requiresTotal: Bool, progress: @escaping (Int) -> Void, onTotal: ((Int) -> Void)?,
             done: @escaping (Attempt) -> Void
         ) {
+            self.requiresTotal = requiresTotal
             self.onTotal = onTotal
             self.handle = handle
             self.rangeStart = rangeStart
@@ -90,6 +92,7 @@ public final class FileDownloader: NSObject, URLSessionDataDelegate, @unchecked 
     /// a u32 that wraps above 4 GiB, so a long clip can be listed as a few MB (or 0).
     public func download(
         urlPath: String, to destination: URL, expectedSize: Int,
+        identity: String? = nil,
         onTotal: (@Sendable (Int) -> Void)? = nil,
         progress: @escaping @Sendable (Int) -> Void
     ) async -> Result {
@@ -103,6 +106,7 @@ public final class FileDownloader: NSObject, URLSessionDataDelegate, @unchecked 
         // size can disagree slightly with the stored bytes, so it is not compared).
         if fm.fileExists(atPath: destination.path) { return .skipped(destination) }
         let part = destination.appendingPathExtension("part")
+        let metadata = destination.appendingPathExtension("part.identity")
         do {
             try fm.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
         } catch {
@@ -111,6 +115,15 @@ public final class FileDownloader: NSObject, URLSessionDataDelegate, @unchecked 
         // A `.part` must be a plain file we made: never follow a symlink someone left in its place.
         if (try? fm.attributesOfItem(atPath: part.path)[.type] as? FileAttributeType) == .typeSymbolicLink {
             try? fm.removeItem(at: part)
+        }
+        if let identity {
+            if (try? fm.attributesOfItem(atPath: metadata.path)[.type] as? FileAttributeType) == .typeSymbolicLink {
+                try? fm.removeItem(at: metadata)
+            }
+            let saved = (try? Data(contentsOf: metadata)).flatMap { String(data: $0, encoding: .utf8) }
+            if saved != identity { try? fm.removeItem(at: part) }
+            do { try Data(identity.utf8).write(to: metadata, options: .atomic) }
+            catch { return .failed("could not save the download identity") }
         }
         if !fm.fileExists(atPath: part.path) { fm.createFile(atPath: part.path, contents: nil) }
 
@@ -124,6 +137,7 @@ public final class FileDownloader: NSObject, URLSessionDataDelegate, @unchecked 
             }
             do {
                 try fm.moveItem(at: part, to: destination)
+                try? fm.removeItem(at: metadata)
                 return .saved(destination)
             } catch {
                 return .failed("could not save: \(error.localizedDescription)")
@@ -132,13 +146,25 @@ public final class FileDownloader: NSObject, URLSessionDataDelegate, @unchecked 
 
         if partSize() > 0 { log("resuming \(destination.lastPathComponent) at \(partSize() / 1_000_000) MB") }
 
+        var declaredTotal: Int?
         var attempt = 0
         var barren = 0
         while true {
             if Task.isCancelled { return .cancelled }
             let offset = partSize()
-            let outcome = await fetch(urlPath: urlPath, into: part, from: offset, onTotal: onTotal, progress: progress)
+            let outcome = await fetch(urlPath: urlPath, into: part, from: offset, requiresTotal: identity != nil, onTotal: onTotal, progress: progress)
             if Task.isCancelled { return .cancelled }
+            if identity != nil {
+                let total: Int?
+                switch outcome {
+                case .done(let n), .interrupted(let n): total = n
+                default: total = nil
+                }
+                if let total {
+                    if let declaredTotal, declaredTotal != total { return .failed("aircraft changed the file length during download") }
+                    declaredTotal = total
+                }
+            }
             var after = partSize()
             if case .rangeIgnored = outcome {
                 if let h = try? FileHandle(forWritingTo: part) { try? h.truncate(atOffset: 0); try? h.close() }
@@ -185,6 +211,7 @@ public final class FileDownloader: NSObject, URLSessionDataDelegate, @unchecked 
     /// One HTTP attempt, appending to `part` from `offset`.
     private func fetch(
         urlPath: String, into part: URL, from offset: Int,
+        requiresTotal: Bool,
         onTotal: (@Sendable (Int) -> Void)?,
         progress: @escaping @Sendable (Int) -> Void
     ) async -> Attempt {
@@ -198,7 +225,7 @@ public final class FileDownloader: NSObject, URLSessionDataDelegate, @unchecked 
         let task = session.dataTask(with: req)
         return await withTaskCancellationHandler {
             await withCheckedContinuation { (cont: CheckedContinuation<Attempt, Never>) in
-                let state = TaskState(handle: handle, rangeStart: offset, progress: progress, onTotal: onTotal) { outcome in
+                let state = TaskState(handle: handle, rangeStart: offset, requiresTotal: requiresTotal, progress: progress, onTotal: onTotal) { outcome in
                     try? handle.close()
                     cont.resume(returning: outcome)
                 }
@@ -239,7 +266,7 @@ public final class FileDownloader: NSObject, URLSessionDataDelegate, @unchecked 
             return
         }
         // The camera serves files, never web pages: an HTML answer is some other device at this address.
-        if let type = http?.value(forHTTPHeaderField: "Content-Type"), type.lowercased().contains("text/html") {
+        if let type = http?.value(forHTTPHeaderField: "Content-Type"), (type.lowercased().hasPrefix("text/") || type.lowercased().contains("json")) {
             st.outcome = .failed(-3)
             completionHandler(.cancel)
             return
@@ -249,10 +276,20 @@ public final class FileDownloader: NSObject, URLSessionDataDelegate, @unchecked 
             completionHandler(.cancel)
             return
         }
+        if code == 206 {
+            guard let value = http?.value(forHTTPHeaderField: "Content-Range"),
+                  let match = value.wholeMatch(of: /bytes (\d+)-(\d+)\/(\d+)/),
+                  Int(match.1) == st.rangeStart, let end = Int(match.2), let total = Int(match.3),
+                  end >= st.rangeStart, end < total, total <= CameraHTTP.maxFileSize,
+                  response.expectedContentLength == Int64(end - st.rangeStart + 1) else {
+                st.outcome = .failed(-4); completionHandler(.cancel); return
+            }
+        }
         st.total =
             code == 206
             ? Self.contentRangeTotal(http)
             : CameraHTTP.plausibleSize(String(response.expectedContentLength))
+        if st.requiresTotal && st.total == nil { st.outcome = .failed(-4); completionHandler(.cancel); return }
         if let total = st.total { st.onTotal?(total) }
         completionHandler(.allow)
     }

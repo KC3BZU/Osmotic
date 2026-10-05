@@ -269,3 +269,23 @@ final class Totals: @unchecked Sendable {
         server.stop()
     }
 }
+
+@Suite struct DroneDownloadTests {
+    @Test func mismatchedPartialIdentityRestarts() async throws {
+        let body = Array("original media bytes".utf8)
+        let server = try FakeHTTPServer(body: body, script: [.serve])
+        defer { server.stop() }
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let dest = dir.appendingPathComponent("DJI_0001.MP4")
+        try Data([9, 9, 9]).write(to: dest.appendingPathExtension("part"))
+        try Data("old identity".utf8).write(to: dest.appendingPathExtension("part.identity"))
+        let downloader = FileDownloader(http: CameraHTTP(ip: "127.0.0.1", port: Int(server.port)), log: { _ in })
+        let result = await downloader.download(urlPath: "/v1?file_index=6553601&file_subtype=0&file_seg_subindex=0", to: dest,
+            expectedSize: 1, identity: "new identity", progress: { _ in })
+        #expect(result == .saved(dest))
+        #expect(try Data(contentsOf: dest) == Data(body))
+        #expect(server.ranges == [0])
+    }
+}

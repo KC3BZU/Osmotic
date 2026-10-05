@@ -15,7 +15,10 @@ public final class DroneSessionHandshake {
     private struct DjiMessageKey: Hashable { let id: Int; let type: Int; let payload: [UInt8] }
 
     public init(identity: String) {
-        self.identity = Array(identity.lowercased().utf8.prefix(19))
+        let raw = identity.lowercased()
+        let b = Array(raw)
+        let formatted = b.count == 32 ? String(b[0..<8]) + "-" + String(b[8..<12]) + "-" + String(b[12..<16]) + "-" : raw
+        self.identity = Array(formatted.utf8.prefix(19))
     }
 
     private func wrap(cmd: Int, flags: Int, id: Int, body: [UInt8]) throws -> DjiMessage {

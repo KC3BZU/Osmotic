@@ -82,6 +82,7 @@ extension AppModel {
             }
             let result = await downloader.download(
                 urlPath: f.originalURLPath, to: dest, expectedSize: size(of: f),
+                identity: f.address == .path ? nil : f.downloadIdentity,
                 onTotal: { total in Task { @MainActor [weak self] in self?.transferRealSize(fileId: f.id, total: total) } },
                 progress: { bytes in Task { @MainActor [weak self] in self?.transferProgress(fileId: f.id, bytes: bytes) } }
             )

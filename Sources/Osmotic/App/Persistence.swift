@@ -173,7 +173,7 @@ final class DownloadHistory {
         keys = (try? Data(contentsOf: url)).flatMap { try? JSONDecoder().decode(Set<String>.self, from: $0) } ?? []
     }
 
-    static func key(_ f: CameraFile) -> String { "\(f.name)|\(f.sizeBytes)" }
+    static func key(_ f: CameraFile) -> String { f.address == .path ? "\(f.name)|\(f.sizeBytes)" : f.downloadIdentity }
 
     func contains(_ f: CameraFile) -> Bool { keys.contains(Self.key(f)) }
 
@@ -195,6 +195,13 @@ enum DownloadPaths {
         byDate: Bool = Preferences.organizeByDate
     ) -> URL {
         var dir = root
+        if case .drone(let index, _) = f.address {
+            dir = dir.appendingPathComponent("Avata-" + CameraFile.safeFileName(f.deviceIdentity), isDirectory: true)
+                .appendingPathComponent("storage-\(f.storage)", isDirectory: true)
+                .appendingPathComponent("DCF-\((index >> 16) & 0x3fff)", isDirectory: true)
+            // A reused DCF number is a distinct item when the capture date differs.
+            dir = dir.appendingPathComponent(String(Int(f.recordCaptureDate?.timeIntervalSince1970 ?? 0)), isDirectory: true)
+        }
         // `YYYY-MM-DD` straight from the name's stamp (the camera's local date): no formatter per call —
         // this runs for every file whenever the history is refreshed.
         let t = Array(f.timestamp.utf8)
