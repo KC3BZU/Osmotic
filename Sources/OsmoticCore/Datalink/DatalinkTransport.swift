@@ -44,6 +44,7 @@ public final class DatalinkTransport {
     public let port: UInt16
     private let log: (String) -> Void
     private let interfaceName: String?
+    private let localPort: UInt16?
 
     public private(set) var sessionId = 0
     private var udpSeq = 0
@@ -83,7 +84,8 @@ public final class DatalinkTransport {
     private var peer = sockaddr_in()
     public private(set) var peerIp = ""
 
-    public init(port: UInt16, interfaceName: String? = nil, log: @escaping (String) -> Void) {
+    public init(port: UInt16, interfaceName: String? = nil, localPort: UInt16? = nil, log: @escaping (String) -> Void) {
+        self.localPort = localPort
         self.port = port
         self.interfaceName = interfaceName
         self.log = log
@@ -105,6 +107,18 @@ public final class DatalinkTransport {
         var bufSize: Int32 = 4 << 20
         setsockopt(s, SOL_SOCKET, SO_RCVBUF, &bufSize, socklen_t(MemoryLayout<Int32>.size))
         Self.bindToInterface(s, interfaceName, log: log)
+        if let localPort {
+            var local = sockaddr_in()
+            local.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+            local.sin_family = sa_family_t(AF_INET)
+            local.sin_port = localPort.bigEndian
+            let result = withUnsafePointer(to: &local) {
+                $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                    Darwin.bind(s, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+                }
+            }
+            if result != 0 { let e = errno; Darwin.close(s); throw DatalinkError.bind(e) }
+        }
         fd = s
         peer = sockaddr_in()
         peer.sin_family = sa_family_t(AF_INET)
@@ -215,6 +229,15 @@ public final class DatalinkTransport {
         }
     }
 
+    /// Explicit addresses for the drone's tunnel. Camera command sequencing stays separate.
+    public func sendDumlRaw(_ message: DjiMessage, drone: Bool) {
+        cmdCounter += 1
+        let routing = DatalinkHeaders.routingHeader(seq: udpSeq,
+            peerAck: windowModel == .mimo ? peerAckedTxSeq : nil,
+            cmdCounter: cmdCounter, drone: drone)
+        sendRaw(pktType: 0x05, payload: routing + message.encode())
+    }
+
     private func advance() { udpSeq = (udpSeq + 8) & 0xFFFF }
 
     // ---- receive --------------------------------------------------------------------------------
@@ -294,9 +317,11 @@ public final class DatalinkTransport {
 
 public enum DatalinkError: Error, CustomStringConvertible {
     case socket(Int32)
+    case bind(Int32)
 
     public var description: String {
         switch self {
+        case .bind(let e): "bind() failed: \(String(cString: strerror(e)))"
         case .socket(let e): "socket() failed: \(String(cString: strerror(e)))"
         }
     }
