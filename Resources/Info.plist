@@ -14,13 +14,13 @@
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
-	<string>io.github.smithplus.osmotic</string>
+	<string>io.github.kc3bzu.osmotic-avata</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>Osmotic</string>
+	<string>Osmotic Avata</string>
 	<key>CFBundleDisplayName</key>
-	<string>Osmotic</string>
+	<string>Osmotic Avata</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -44,7 +44,9 @@
 	<key>NSDownloadsFolderUsageDescription</key>
 	<string>Osmotic saves your camera’s videos and photos to the DJI folder in Downloads.</string>
 	<key>OsmoticUpdatePublicKey</key>
-	<string>E91cPnO2WAGj9zKOmR9UaBkEytuPIqKiZ4Kjbl1wao4=</string>
+	<string></string>
+	<key>OsmoticUpdatesEnabled</key>
+	<false/>
 	<key>NSCameraUsageDescription</key>
 	<string>Osmotic shows your DJI camera’s picture when it’s plugged in by USB as a webcam.</string>
 	<key>NSBonjourServices</key>

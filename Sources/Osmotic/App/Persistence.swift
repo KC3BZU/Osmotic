@@ -16,6 +16,8 @@ struct SavedCamera: Codable, Hashable, Identifiable {
 enum Preferences {
     private static let d = UserDefaults.standard
 
+    static var pairingIdentifier: String { PairingIdentity.load(from: d) }
+
     static var defaultDownloadFolder: URL {
         FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0].appendingPathComponent(
             "DJI", isDirectory: true)
@@ -123,7 +125,7 @@ enum SavedCameraStore {
 
 /// Generic-password items under one service name, one account per saved camera.
 enum Keychain {
-    private static let service = "io.github.smithplus.osmotic.camera-wifi"
+    private static let service = "io.github.kc3bzu.osmotic-avata.camera-wifi"
 
     private static func query(_ account: String) -> [String: Any] {
         [
@@ -165,7 +167,7 @@ final class DownloadHistory {
 
     init() {
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Osmotic", isDirectory: true)
+            .appendingPathComponent("Osmotic Avata", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         url = dir.appendingPathComponent("downloaded.json")
         keys = (try? Data(contentsOf: url)).flatMap { try? JSONDecoder().decode(Set<String>.self, from: $0) } ?? []

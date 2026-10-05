@@ -213,7 +213,7 @@ final class AppModel {
 
     static var thumbnailCacheDir: URL {
         FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("io.github.smithplus.osmotic/thumbs", isDirectory: true)
+            .appendingPathComponent("io.github.kc3bzu.osmotic-avata/thumbs", isDirectory: true)
     }
 
     init() {

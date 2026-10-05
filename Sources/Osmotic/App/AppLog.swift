@@ -32,7 +32,7 @@ final class FileSink: @unchecked Sendable {
     private let queue = DispatchQueue(label: "osmotic.log")
     private let handle: FileHandle?
     private let formatter: DateFormatter
-    private let logger = Logger(subsystem: "io.github.smithplus.osmotic", category: "app")
+    private let logger = Logger(subsystem: "io.github.kc3bzu.osmotic-avata", category: "app")
 
     nonisolated static func makeSessionLog() -> FileSink {
         // Demo and snapshot runs log to a temporary folder: their launches must never rotate away the
@@ -41,9 +41,9 @@ final class FileSink: @unchecked Sendable {
         let rehearsal = env["OSMOTIC_DEMO_MANIFEST"] != nil || env["OSMOTIC_SNAPSHOT"] != nil
         let dir =
             rehearsal
-            ? FileManager.default.temporaryDirectory.appendingPathComponent("Osmotic-demo-logs", isDirectory: true)
+            ? FileManager.default.temporaryDirectory.appendingPathComponent("Osmotic-Avata-demo-logs", isDirectory: true)
             : FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
-                .appendingPathComponent("Logs/Osmotic", isDirectory: true)
+                .appendingPathComponent("Logs/Osmotic Avata", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         // Real sessions are what diagnoses a camera: keep plenty.
         prune(dir, keep: rehearsal ? 5 : 50)

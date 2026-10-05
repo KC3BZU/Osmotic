@@ -1,3 +1,13 @@
+# Osmotic Avata development fork
+
+This fork adds experimental wireless media transfer for Avata 2. It derives from [Osmotic by smithplus](https://github.com/smithplus/Osmotic) and [Osmosis by Konrad Iturbe](https://github.com/KonradIT/osmosis). The upstream documentation follows below.
+
+Local hardware discovery confirmed Avata 2 model `0x0077` on 2026-10-05. Pairing and downloads are not yet verified. The baseline core suite passed 105 tests in 24 suites. Run fresh core tests with `scripts/test_core.sh`.
+
+The fork uses a separate app identity and state, and disables upstream updates. Full app builds need a SwiftUI-capable toolchain; the installed Command Line Tools currently lack its macro plugin.
+
+Development branch: `kc3bzu/avata2-quicktransfer`. See the [approved design](docs/superpowers/specs/2026-10-05-avata2-transfer-design.md) and [implementation plan](docs/superpowers/plans/2026-10-05-avata2-transfer.md).
+
 <div align="center">
 
 <img src="docs/images/icon.png" width="128" alt="Osmotic icon">

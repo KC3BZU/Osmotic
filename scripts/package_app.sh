@@ -10,7 +10,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CONFIG="${1:-release}"
-APP_DIR="$ROOT_DIR/build/Osmotic.app"
+APP_DIR="$ROOT_DIR/build/Osmotic Avata.app"
 SIGN_IDENTITY="${SIGN_IDENTITY:--}"
 
 ARCH_FLAGS=()
@@ -55,7 +55,7 @@ chmod +x "$APP_DIR/Contents/MacOS/Osmotic"
 # Hardened runtime: no JIT, no unsigned libraries, no debugger attach — the app needs none of them.
 # Its resource-access entitlements (location, camera) are in Resources/Osmotic.entitlements.
 SIGN_FLAGS=(--force --sign "$SIGN_IDENTITY" --options runtime --entitlements "$ROOT_DIR/Resources/Osmotic.entitlements"
-  --identifier io.github.smithplus.osmotic)
+  --identifier io.github.kc3bzu.osmotic-avata)
 if [ "$SIGN_IDENTITY" != "-" ]; then SIGN_FLAGS+=(--timestamp); fi   # notarization requires a secure timestamp
 codesign "${SIGN_FLAGS[@]}" "$APP_DIR"
 echo "$APP_DIR"

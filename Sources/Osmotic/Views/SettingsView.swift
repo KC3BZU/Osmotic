@@ -95,6 +95,7 @@ private struct UpdatesPane: View {
             Section {
                 LabeledContent("Version") { Text(verbatim: updater.currentVersion.description) }
                 Toggle("Check for updates automatically", isOn: $automatic)
+                    .disabled(!updater.isEnabled)
                     .onChange(of: automatic) { updater.checkAutomatically = automatic }
                 LabeledContent("Status") {
                     HStack {

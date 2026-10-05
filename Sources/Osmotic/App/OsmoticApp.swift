@@ -8,7 +8,7 @@ struct OsmoticApp: App {
 
     var body: some Scene {
         // One window, one camera session: a Window, not a WindowGroup (no duplicate windows or tabs).
-        Window("Osmotic", id: "main") {
+        Window("Osmotic Avata", id: "main") {
             RootView()
                 .environment(model)
                 .frame(minWidth: 820, minHeight: 560)
@@ -24,6 +24,7 @@ struct OsmoticApp: App {
             CommandGroup(replacing: .newItem) {}
             CommandGroup(after: .appInfo) {
                 Button("Check for Updates…") { Task { await model.updater.check(userInitiated: true) } }
+                    .disabled(!model.updater.isEnabled)
             }
             CommandMenu("Camera") {
                 Button("Download New") { model.downloadNew() }

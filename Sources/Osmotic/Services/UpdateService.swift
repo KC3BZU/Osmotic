@@ -21,7 +21,8 @@ final class UpdateService {
     /// The public half of the release-signing key (base64, Ed25519), from Info.plist. Empty: this build
     /// can say an update exists and open its page, but won't install it.
     let publicKey = (Bundle.main.object(forInfoDictionaryKey: "OsmoticUpdatePublicKey") as? String) ?? ""
-    var canInstall: Bool { !publicKey.isEmpty }
+    let isEnabled = Bundle.main.object(forInfoDictionaryKey: "OsmoticUpdatesEnabled") as? Bool ?? false
+    var canInstall: Bool { isEnabled && !publicKey.isEmpty }
     /// Set by the app model: installing quits the app, so it must not cut a camera session or download.
     @ObservationIgnored var isSafeToInstall: () -> Bool = { false }
 
@@ -30,7 +31,7 @@ final class UpdateService {
         ?? SemVer("0.0.0")!
 
     var checkAutomatically: Bool {
-        get { UserDefaults.standard.object(forKey: "updateCheckAutomatically") as? Bool ?? true }
+        get { isEnabled && (UserDefaults.standard.object(forKey: "updateCheckAutomatically") as? Bool ?? true) }
         set { UserDefaults.standard.set(newValue, forKey: "updateCheckAutomatically") }
     }
 
@@ -44,6 +45,7 @@ final class UpdateService {
     private var isFailed: Bool { if case .failed = state { true } else { false } }
 
     func check(userInitiated: Bool) async {
+        guard isEnabled else { state = .idle; return }
         if case .downloading = state { return }
         state = .checking
         var request = URLRequest(url: UpdateFeed.latestReleaseAPI, timeoutInterval: 15)
@@ -70,6 +72,7 @@ final class UpdateService {
 
     /// Download, verify and stage the release, then quit; the swap script reopens the new version.
     func install(_ release: ReleaseInfo) async {
+        guard isEnabled else { return }
         guard canInstall else { NSWorkspace.shared.open(release.pageURL); return }
         guard isSafeToInstall() else {
             state = .failed(String(localized: "Disconnect from the camera to install."))

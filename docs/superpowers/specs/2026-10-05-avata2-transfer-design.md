@@ -76,6 +76,14 @@ Reuse Files, filters, selection, Download Selected, Download New, progress, dest
 
 Restore the previous Wi-Fi after success, failure, cancel, disconnect, or quit. Reuse the existing independent cleanup task so cancellation cannot interrupt restoration. Stage errors distinguish discovery, approval, credentials, Wi-Fi, UDP handshake, session unlock, listing, and HTTP download. Log command IDs, counters, lengths, and timings without private payloads.
 
+## Offline test harness
+
+Alex has no second internet connection and authorized an autonomous harness on 2026-10-05. Use a bundled local runner with a 120-second offline budget. It captures the current Wi-Fi name under Location permission and verifies that the return network is saved before any AP join. If that preflight fails, stay online.
+
+Spawn an independent watchdog and require its ready acknowledgement before joining the drone. The watchdog keeps the return-network data in a private local file, survives the test process exiting, and attempts reconnection on completion, crash, or deadline. It terminates only the matching test process before restoration to prevent a late drone join from undoing recovery. Recovery uses the saved network credentials, never an exported password. Bound every external recovery command and retry three times; verify internet access after reconnection and record any failure explicitly.
+
+The runner drives discovery, pairing, session opening, listing, and one small original download without needing model access. It saves stage results and sanitized logs locally. Initial Bluetooth/Location/Local Network prompts and physical drone approval remain one-time prerequisites. A native AppKit diagnostic runner can support these staged tests while the full SwiftUI app toolchain is unavailable.
+
 ## Verification
 
 1. Establish an upstream baseline with `swift test` and `swift build` on this Mac. Record any environment limitations separately from code failures.

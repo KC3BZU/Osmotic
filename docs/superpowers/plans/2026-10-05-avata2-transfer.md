@@ -135,3 +135,7 @@ No full Xcode installation or SwiftUI macro plugin was found in `/Applications`,
 ## Execution recommendation
 
 Native execution is recommended: the tasks share the session/file interfaces, and the hardware findings can change the next task. Implement in this chat with focused verification after each task and a final independent code review. Await Alex's review of this plan and execution-method choice before product changes.
+
+## Authorized offline-harness extension
+
+Alex approved this plan and requested automatic offline testing on 2026-10-05. Fold return-network capture, a 120-second lease, and an independent watchdog into Task 6. Add core lease tests for unknown/unsaved return networks, expiry, cancellation, owner exit, and stale process identity. Add a bundled AppKit runner and its packaging script so staged hardware tests can run without the missing SwiftUI macro tool. Require watchdog acknowledgement before Wi-Fi changes; bound restoration commands, attempt reconnection three times, and verify internet access. Keep all private network state outside Git. No additional design gate is needed for the explicitly authorized harness.
