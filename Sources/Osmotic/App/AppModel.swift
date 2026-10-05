@@ -106,6 +106,7 @@ final class AppModel {
     var files: [CameraFile] = []
     var status = CameraStatus()
     var moreAvailable = false
+    var pagingError: String?
     var loadingMore = false
     var selection: Set<String> = []
     var filter: Filter = .all

@@ -20,6 +20,7 @@ public final class DroneMediaSession: MediaSession, @unchecked Sendable {
     private var sequence = 0
     private var cursor: UInt32 = 1
     private var seen: Set<String> = []
+    private var replyStream = DumlFrameAccumulator()
     private var lastBeacon = Date.distantPast
     private var lastRX = Date()
     private var lost = false
@@ -96,10 +97,14 @@ public final class DroneMediaSession: MediaSession, @unchecked Sendable {
         }
     }
     public func nextPage() async -> (files: [CameraFile], moreAvailable: Bool) {
-        await submit { [self] in
-            guard ready, !isClosed else { return ([], false) }
-            do { return try readPage() } catch { fail(error); return ([], false) }
+        do { return try await loadNextPage() } catch { return ([], !isClosed) }
+    }
+    public func loadNextPage() async throws -> (files: [CameraFile], moreAvailable: Bool) {
+        let result: Result<(files: [CameraFile], moreAvailable: Bool), any Error> = await submit { [self] in
+            guard ready, !isClosed else { return .failure(DroneSessionError.unsupportedSession) }
+            do { return .success(try readPage()) } catch { fail(error); return .failure(error) }
         }
+        return try result.get()
     }
     private func pump(ms: Int) throws -> [DjiMessage] {
         if isClosed { throw CancellationError() }
@@ -112,9 +117,17 @@ public final class DroneMediaSession: MediaSession, @unchecked Sendable {
             lost = true; onLinkLost?()
         }
         for packet in packets {
-            // Scan outer frames by CRC, then validate each tunnel's inner frame separately.
-            for frame in DumlScanner.frames(in: packet) {
-                guard let message = DjiMessage(frame: Array(packet[frame.start..<(frame.start + frame.length)])) else { continue }
+            // Reply DUML is a stream: strip each datagram's 8-byte transport and 12-byte routing
+            // headers before reassembly. Telemetry tunnels are independently CRC-checked.
+            let decoded: [DjiMessage]
+            if packet.count > 20, packet[6] == 3 {
+                decoded = replyStream.append(Array(packet.dropFirst(20)))
+            } else {
+                decoded = DumlScanner.frames(in: packet).compactMap {
+                    DjiMessage(frame: Array(packet[$0.start..<($0.start + $0.length)]))
+                }
+            }
+            for message in decoded {
                 if message.cmdSet == 0x51 && message.cmdId == 1 {
                     guard let inner = DroneCommands.unwrap(message) else { continue }
                     for reply in try handshake.receive(inner) { tx.sendDumlRaw(reply, drone: true) }
@@ -137,6 +150,7 @@ public final class DroneMediaSession: MediaSession, @unchecked Sendable {
     }
     private func readPage() throws -> (files: [CameraFile], moreAvailable: Bool) {
         guard !isClosed else { throw CancellationError() }
+        replyStream = DumlFrameAccumulator()
         sequence = (sequence + 1) & 0xffff
         let query = envelope(
             subtype: 0, length: 33,
@@ -157,14 +171,16 @@ public final class DroneMediaSession: MediaSession, @unchecked Sendable {
                 let all = try collector.files().map { f in
                     var f = f; f.deviceIdentity = deviceIdentity; return f
                 }
-                let fresh = all.filter { seen.insert($0.id).inserted }
+                let fresh = all.filter { !seen.contains($0.id) }
                 let next = all.last.flatMap { file -> UInt32? in
                     if case .drone(let index, _) = file.address { return index }; return nil
                 }
                 let advances = next != nil && next != cursor && !fresh.isEmpty
+                if collector.recordCount >= 45 && !advances { throw DroneSessionError.nonAdvancingPage }
+                seen.formUnion(fresh.map(\.id))
                 if let next, advances { cursor = next }
                 onProgress?(1)
-                return (fresh, all.count >= 45 && advances)
+                return (fresh, collector.recordCount >= 45 && advances)
             }
         }
         throw isClosed ? CancellationError() : DroneSessionError.incompleteManifest

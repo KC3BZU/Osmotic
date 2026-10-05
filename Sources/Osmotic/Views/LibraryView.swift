@@ -54,6 +54,11 @@ struct LibraryView: View {
                     .padding(.horizontal, Theme.s3)
                     .padding(.bottom, Theme.s3)
 
+                if let error = model.pagingError {
+                    ErrorBanner(message: error)
+                        .padding(.horizontal, Theme.s3)
+                        .padding(.bottom, Theme.s3)
+                }
                 if let error = model.controlError {
                     // Why Live didn't open (downloads running, the camera refused capture mode).
                     ErrorBanner(message: error)

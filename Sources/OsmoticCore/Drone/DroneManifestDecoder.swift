@@ -22,11 +22,14 @@ public enum DroneManifestDecoder {
             f.address = .drone(index: index, segment: 0)
             f.storageKnown = true
             let fat = r.u32le(0)
+            f.recordTimestamp = UInt32(fat)
             var c = DateComponents()
             c.year = 1980 + ((fat >> 25) & 127); c.month = (fat >> 21) & 15; c.day = (fat >> 16) & 31
             c.hour = (fat >> 11) & 31; c.minute = (fat >> 5) & 63; c.second = (fat & 31) * 2
             if (1...12).contains(c.month ?? 0), (1...31).contains(c.day ?? 0), c.hour! < 24, c.minute! < 60 {
-                f.recordCaptureDate = Calendar.current.date(from: c)
+                var calendar = Calendar(identifier: .gregorian)
+                calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+                f.recordCaptureDate = calendar.date(from: c)
             }
             files.append(f)
         }

@@ -18,6 +18,7 @@ extension AppModel {
     private func start(_ t: Target) {
         guard screen != .connecting || connectError != nil else { return }
         target = t
+        pagingError = nil
         connectError = nil
         needsApproval = false
         passwordPromptSSID = nil

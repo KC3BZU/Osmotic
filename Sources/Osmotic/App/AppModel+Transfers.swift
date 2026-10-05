@@ -6,7 +6,10 @@ import OsmoticCore
 // =========================================================================================
 
 extension AppModel {
-    func downloadNew() { enqueue(newNotQueued) }
+    func downloadNew() {
+        guard pagingError == nil else { controlError = pagingError; return }
+        enqueue(newNotQueued)
+    }
 
     func downloadSelected() { enqueue(selectedFiles) }
 

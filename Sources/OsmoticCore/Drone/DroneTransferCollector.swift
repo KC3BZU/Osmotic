@@ -8,6 +8,7 @@ public struct DroneTransferCollector {
     private var count: Int?
     private var total: Int?
     public init(sequence: Int) { self.sequence = sequence }
+    public var recordCount: Int { count ?? 0 }
     public var isComplete: Bool {
         guard let finalIndex, let total, count != nil, chunks.count == finalIndex + 1,
             (0...finalIndex).allSatisfy({ chunks[$0] != nil })

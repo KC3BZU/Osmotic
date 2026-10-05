@@ -28,6 +28,7 @@ import Testing
         #expect(files.count == 1)
         #expect(files[0].originalURLPath == "/v1?file_index=6553607&file_subtype=0&file_seg_subindex=0")
         #expect(files[0].captureDate != nil)
+        #expect(files[0].recordTimestamp == UInt32(record().u32le(0)))
     }
     @Test func missingWrongSequenceAndConflicts() throws {
         var c = DroneTransferCollector(sequence: 9)
@@ -84,6 +85,33 @@ import Testing
         await session.close()
         try await Task.sleep(for: .milliseconds(80))
         #expect(drone.releases == 1)
+    }
+
+    @Test func manifestSpansUDPDatagrams() async throws {
+        let drone = try FakeDrone(manifest: record(), splitManifest: true)
+        defer { drone.stop() }
+        let session = DroneMediaSession(
+            ip: "127.0.0.1", model: CameraModel.resolve(modelId: 0x77, name: ""),
+            interfaceName: nil, port: drone.port, localPort: nil, pageTimeout: 0.4, log: { _ in })
+        let result = await session.connect()
+        await session.close()
+        #expect(result.handshakeOk)
+        #expect(result.files.count == 1)
+    }
+
+    @Test func olderPageTimeoutIsRetryableFailure() async throws {
+        let drone = try FakeDrone(manifest: record(), failAfterFirstPage: true)
+        defer { drone.stop() }
+        let session = DroneMediaSession(
+            ip: "127.0.0.1", model: CameraModel.resolve(modelId: 0x77, name: ""),
+            interfaceName: nil, port: drone.port, localPort: nil, pageTimeout: 0.2, log: { _ in })
+        let result = await session.connect()
+        #expect(result.handshakeOk)
+        await #expect(throws: DroneSessionError.self) { _ = try await session.loadNextPage() }
+        #expect(session.failureDescription != nil)
+        let compat = await session.nextPage()
+        #expect(compat.moreAvailable)
+        await session.close()
     }
 
 }

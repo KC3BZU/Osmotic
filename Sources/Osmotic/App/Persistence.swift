@@ -200,7 +200,9 @@ enum DownloadPaths {
                 .appendingPathComponent("storage-\(f.storage)", isDirectory: true)
                 .appendingPathComponent("DCF-\((index >> 16) & 0x3fff)", isDirectory: true)
             // A reused DCF number is a distinct item when the capture date differs.
-            dir = dir.appendingPathComponent(String(Int(f.recordCaptureDate?.timeIntervalSince1970 ?? 0)), isDirectory: true)
+            dir = dir.appendingPathComponent(
+                f.recordTimestamp.map(String.init) ?? String(Int(f.recordCaptureDate?.timeIntervalSince1970 ?? 0)),
+                isDirectory: true)
         }
         // `YYYY-MM-DD` straight from the name's stamp (the camera's local date): no formatter per call —
         // this runs for every file whenever the history is refreshed.

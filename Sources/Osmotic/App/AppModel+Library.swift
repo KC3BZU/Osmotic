@@ -95,7 +95,15 @@ extension AppModel {
         guard moreAvailable, !loadingMore, let s = session else { return 0 }
         loadingMore = true
         defer { loadingMore = false }
-        let page = await s.nextPage()
+        let page: (files: [CameraFile], moreAvailable: Bool)
+        do { page = try await s.loadNextPage() } catch {
+            guard session === s else { return 0 }
+            pagingError = String(describing: error)
+            moreAvailable = true
+            log("library: older-page failed; retry available")
+            return 0
+        }
+        pagingError = nil
         guard session === s else { return 0 }
         let resolved =
             s.model.isDrone

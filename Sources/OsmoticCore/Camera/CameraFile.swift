@@ -5,6 +5,7 @@ public struct CameraFile: Sendable, Hashable, Identifiable {
     /// e.g. `DCIM/DJI_001/DJI_20260329115359_0211_D.MP4`
     public var address: MediaAddress = .path
     public var deviceIdentity: String = ""
+    public var recordTimestamp: UInt32?
     public var recordCaptureDate: Date?
     public var path: String
     /// e.g. `MISC/THM/DJI_001/DJI_20260329115359_0211_D.scr`
@@ -60,7 +61,9 @@ public struct CameraFile: Sendable, Hashable, Identifiable {
         return "\(storage):\(path)"
     }
 
-    public var downloadIdentity: String { "\(id)|\(recordCaptureDate?.timeIntervalSince1970 ?? 0)|\(sizeBytes)" }
+    public var downloadIdentity: String {
+        "\(id)|\(recordTimestamp.map(String.init) ?? String(recordCaptureDate?.timeIntervalSince1970 ?? 0))|\(sizeBytes)"
+    }
 
     public var name: String { path.split(separator: "/").last.map(String.init) ?? path }
 

@@ -289,4 +289,26 @@ final class Totals: @unchecked Sendable {
         #expect(try Data(contentsOf: dest) == Data(body))
         #expect(server.ranges == [0])
     }
+    @Test func conflictingPersistedTotalNeverPromotesOrAppends() async throws {
+        for length in [4, 20] {
+            let body = [UInt8](repeating: 7, count: length)
+            let server = try FakeHTTPServer(body: body, script: [.serve])
+            defer { server.stop() }
+            let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: dir) }
+            let dest = dir.appendingPathComponent("clip.MP4")
+            try Data([1, 2, 3, 4]).write(to: dest.appendingPathExtension("part"))
+            let metadata = try JSONSerialization.data(withJSONObject: ["identity": "same", "verifiedTotal": 10])
+            try metadata.write(to: dest.appendingPathExtension("part.identity"))
+            let downloader = FileDownloader(http: CameraHTTP(ip: "127.0.0.1", port: Int(server.port)), log: { _ in })
+            let result = await downloader.download(
+                urlPath: "/v1", to: dest, expectedSize: 10, identity: "same", progress: { _ in })
+            if case .failed = result {} else { Issue.record("Changed length must fail, got \(result)") }
+            #expect(!FileManager.default.fileExists(atPath: dest.path))
+            #expect(!FileManager.default.fileExists(atPath: dest.appendingPathExtension("part").path))
+            #expect(server.ranges == [4])
+        }
+    }
+
 }

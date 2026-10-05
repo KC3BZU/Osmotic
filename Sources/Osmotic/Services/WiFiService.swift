@@ -26,6 +26,10 @@ enum WiFiService {
         }
     }
 
+    // The offline probe relies on CoreWLAN association in its own process. It must never leave
+    // a network-changing CLI child behind when the recovery watchdog terminates that process.
+    nonisolated(unsafe) static var allowNetworksetupJoin = true
+
     nonisolated static let cameraIP = "192.168.2.1"
 
     nonisolated static var interfaceName: String? { CWWiFiClient.shared().interface()?.interfaceName }
@@ -100,7 +104,7 @@ enum WiFiService {
             // networksetup needs no scan, so it covers SSIDs the scan hides from us. It takes the password
             // as an argument, briefly visible to other local users in `ps` (CWE-214) — so only after
             // CoreWLAN has had a few tries (on the Pocket 3 it joins on the first).
-            if !associated && attempt >= 4 {
+            if !associated && attempt >= 4 && allowNetworksetupJoin {
                 let out = runNetworksetup(["-setairportnetwork", name, ssid, password])
                 log("wifi: networksetup join completed (output \(out.isEmpty ? "empty" : "redacted"))")
             }

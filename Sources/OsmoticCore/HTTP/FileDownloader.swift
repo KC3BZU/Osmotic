@@ -42,8 +42,15 @@ public final class FileDownloader: NSObject, URLSessionDataDelegate, @unchecked 
     /// Tasks that completed before their handler was registered (a cancel racing the start).
     private var completedEarly: Set<Int> = []
 
+    private struct ResumeMetadata: Codable {
+        let identity: String
+        let verifiedTotal: Int?
+    }
+
     private final class TaskState {
         let handle: FileHandle
+        let expectedTotal: Int?
+        let recordTotal: @Sendable (Int) -> Bool
         let requiresTotal: Bool
         let rangeStart: Int
         var written: Int
@@ -55,10 +62,13 @@ public final class FileDownloader: NSObject, URLSessionDataDelegate, @unchecked 
         var lastReport = Date.distantPast
 
         init(
-            handle: FileHandle, rangeStart: Int, requiresTotal: Bool, progress: @escaping (Int) -> Void,
+            handle: FileHandle, rangeStart: Int, requiresTotal: Bool, expectedTotal: Int?,
+            recordTotal: @escaping @Sendable (Int) -> Bool, progress: @escaping (Int) -> Void,
             onTotal: ((Int) -> Void)?,
             done: @escaping (Attempt) -> Void
         ) {
+            self.expectedTotal = expectedTotal
+            self.recordTotal = recordTotal
             self.requiresTotal = requiresTotal
             self.onTotal = onTotal
             self.handle = handle
@@ -117,13 +127,21 @@ public final class FileDownloader: NSObject, URLSessionDataDelegate, @unchecked 
         if (try? fm.attributesOfItem(atPath: part.path)[.type] as? FileAttributeType) == .typeSymbolicLink {
             try? fm.removeItem(at: part)
         }
+        var declaredTotal: Int?
         if let identity {
             if (try? fm.attributesOfItem(atPath: metadata.path)[.type] as? FileAttributeType) == .typeSymbolicLink {
                 try? fm.removeItem(at: metadata)
             }
-            let saved = (try? Data(contentsOf: metadata)).flatMap { String(data: $0, encoding: .utf8) }
-            if saved != identity { try? fm.removeItem(at: part) }
-            do { try Data(identity.utf8).write(to: metadata, options: .atomic) } catch {
+            let saved = (try? Data(contentsOf: metadata)).flatMap { try? JSONDecoder().decode(ResumeMetadata.self, from: $0) }
+            if saved?.identity == identity, let total = saved?.verifiedTotal, total > 0, total <= CameraHTTP.maxFileSize {
+                declaredTotal = total
+            } else {
+                try? fm.removeItem(at: part)
+            }
+            do {
+                try JSONEncoder().encode(ResumeMetadata(identity: identity, verifiedTotal: declaredTotal)).write(
+                    to: metadata, options: .atomic)
+            } catch {
                 return .failed("could not save the download identity")
             }
         }
@@ -148,14 +166,25 @@ public final class FileDownloader: NSObject, URLSessionDataDelegate, @unchecked 
 
         if partSize() > 0 { log("resuming \(destination.lastPathComponent) at \(partSize() / 1_000_000) MB") }
 
-        var declaredTotal: Int?
         var attempt = 0
         var barren = 0
         while true {
             if Task.isCancelled { return .cancelled }
             let offset = partSize()
             let outcome = await fetch(
-                urlPath: urlPath, into: part, from: offset, requiresTotal: identity != nil, onTotal: onTotal, progress: progress)
+                urlPath: urlPath, into: part, from: offset, requiresTotal: identity != nil, expectedTotal: declaredTotal,
+                recordTotal: { total in
+                    guard let identity else { return true }
+                    do {
+                        try JSONEncoder().encode(ResumeMetadata(identity: identity, verifiedTotal: total)).write(
+                            to: metadata, options: .atomic);
+                        return true
+                    } catch { return false }
+                }, onTotal: onTotal, progress: progress)
+            if case .failed(-5) = outcome {
+                try? fm.removeItem(at: part); try? fm.removeItem(at: metadata)
+                return .failed("aircraft changed the file length; partial discarded")
+            }
             if Task.isCancelled { return .cancelled }
             if identity != nil {
                 let total: Int?
@@ -165,6 +194,7 @@ public final class FileDownloader: NSObject, URLSessionDataDelegate, @unchecked 
                 }
                 if let total {
                     if let declaredTotal, declaredTotal != total {
+                        try? fm.removeItem(at: part); try? fm.removeItem(at: metadata)
                         return .failed("aircraft changed the file length during download")
                     }
                     declaredTotal = total
@@ -216,7 +246,7 @@ public final class FileDownloader: NSObject, URLSessionDataDelegate, @unchecked 
     /// One HTTP attempt, appending to `part` from `offset`.
     private func fetch(
         urlPath: String, into part: URL, from offset: Int,
-        requiresTotal: Bool,
+        requiresTotal: Bool, expectedTotal: Int?, recordTotal: @escaping @Sendable (Int) -> Bool,
         onTotal: (@Sendable (Int) -> Void)?,
         progress: @escaping @Sendable (Int) -> Void
     ) async -> Attempt {
@@ -231,7 +261,8 @@ public final class FileDownloader: NSObject, URLSessionDataDelegate, @unchecked 
         return await withTaskCancellationHandler {
             await withCheckedContinuation { (cont: CheckedContinuation<Attempt, Never>) in
                 let state = TaskState(
-                    handle: handle, rangeStart: offset, requiresTotal: requiresTotal, progress: progress, onTotal: onTotal
+                    handle: handle, rangeStart: offset, requiresTotal: requiresTotal, expectedTotal: expectedTotal,
+                    recordTotal: recordTotal, progress: progress, onTotal: onTotal
                 ) { outcome in
                     try? handle.close()
                     cont.resume(returning: outcome)
@@ -262,7 +293,12 @@ public final class FileDownloader: NSObject, URLSessionDataDelegate, @unchecked 
         let code = (response as? HTTPURLResponse)?.statusCode ?? -1
         let http = response as? HTTPURLResponse
         // A resume past the last byte: the server answers 416 with `bytes */TOTAL`.
-        if code == 416, st.rangeStart > 0, Self.contentRangeTotal(http) == st.rangeStart {
+        if code == 416, st.requiresTotal, Self.contentRangeTotal(http) != st.expectedTotal {
+            st.outcome = .failed(-5); completionHandler(.cancel); return
+        }
+        if code == 416, st.rangeStart > 0, Self.contentRangeTotal(http) == st.rangeStart,
+            !st.requiresTotal || st.expectedTotal == st.rangeStart
+        {
             st.outcome = .alreadyComplete
             completionHandler(.cancel)
             return
@@ -300,7 +336,15 @@ public final class FileDownloader: NSObject, URLSessionDataDelegate, @unchecked 
             ? Self.contentRangeTotal(http)
             : CameraHTTP.plausibleSize(String(response.expectedContentLength))
         if st.requiresTotal && st.total == nil { st.outcome = .failed(-4); completionHandler(.cancel); return }
-        if let total = st.total { st.onTotal?(total) }
+        if let total = st.total {
+            if st.requiresTotal {
+                guard st.expectedTotal == nil || st.expectedTotal == total else {
+                    st.outcome = .failed(-5); completionHandler(.cancel); return
+                }
+                guard st.recordTotal(total) else { st.outcome = .failed(-2); completionHandler(.cancel); return }
+            }
+            st.onTotal?(total)
+        }
         completionHandler(.allow)
     }
 
@@ -323,6 +367,9 @@ public final class FileDownloader: NSObject, URLSessionDataDelegate, @unchecked 
 
     public func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
         guard let st = state(dataTask) else { return }
+        if st.requiresTotal, let total = st.total, data.count > total - st.written {
+            st.outcome = .failed(-5); dataTask.cancel(); return
+        }
         do {
             try st.handle.write(contentsOf: data)
             st.written += data.count

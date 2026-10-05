@@ -6,13 +6,18 @@ import Foundation
 final class FakeDrone: @unchecked Sendable {
     let port: UInt16
     let manifest: [UInt8]?
+    let failAfterFirstPage: Bool
+    private var queries = 0
+    let splitManifest: Bool
     private let socketFD: Int32
     private let lock = NSLock()
     private var stopped = false
     private var released = 0
     private var threadDone = false
     var releases: Int { lock.withLock { released } }
-    init(manifest: [UInt8]?) throws {
+    init(manifest: [UInt8]?, splitManifest: Bool = false, failAfterFirstPage: Bool = false) throws {
+        self.failAfterFirstPage = failAfterFirstPage
+        self.splitManifest = splitManifest
         self.manifest = manifest
         let socketFD = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
         self.socketFD = socketFD
@@ -59,9 +64,16 @@ final class FakeDrone: @unchecked Sendable {
                     }
                 }
             }
-            func reply(_ message: DjiMessage) {
+            func reply(_ message: DjiMessage, split: Bool = false) {
                 let bytes = message.encode()
-                send(DatalinkHeaders.udpHeader(pktType: 3, payloadLen: bytes.count, sessionId: p.u16le(2), seq: 0x2000) + bytes)
+                let pieces = split ? [Array(bytes.prefix(30)), Array(bytes.dropFirst(30))] : [bytes]
+                for (i, piece) in pieces.enumerated() {
+                    let routing = DatalinkHeaders.routingHeader(seq: 0x2000 + i * 8, cmdCounter: 1, drone: true)
+                    send(
+                        DatalinkHeaders.udpHeader(
+                            pktType: 3, payloadLen: routing.count + piece.count,
+                            sessionId: p.u16le(2), seq: 0x2000 + i * 8) + routing + piece)
+                }
             }
             func tunnel(cmd: Int, flags: Int, id: Int, body: [UInt8]) {
                 let inner = DjiMessage(target: 0xeee9, id: id, type: flags | 0x5100 | cmd << 16, payload: body)
@@ -81,17 +93,18 @@ final class FakeDrone: @unchecked Sendable {
                 let seq = m.payload.u16le(4)
                 if m.payload[1] == 4 { lock.withLock { released += 1 } }
                 if m.payload[1] == 0 {
+                    queries += 1
                     reply(
                         .init(
                             target: 0x0201, id: 1, type: 0x270000, payload: [0x4a, 3] + LE.u16(0x100a) + LE.u16(seq) + LE.u32(0)))
                 }
-                if m.payload[1] == 2, let manifest {
+                if m.payload[1] == 2, let manifest, !(failAfterFirstPage && queries > 1) {
                     let count = manifest.count / 94
                     reply(
                         .init(
                             target: 0x0201, id: 1, type: 0x270000,
                             payload: [0x4a, 1] + LE.u16((18 + manifest.count) | 0x1000) + LE.u16(seq) + LE.u32(0) + LE.u32(count)
-                                + LE.u32(8 + manifest.count) + manifest))
+                                + LE.u32(8 + manifest.count) + manifest), split: splitManifest)
                 }
             }
         }

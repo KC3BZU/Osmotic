@@ -1,5 +1,6 @@
 import AppKit
 import CoreWLAN
+import CryptoKit
 import Foundation
 import OsmoticCore
 
@@ -36,6 +37,7 @@ nonisolated func redactedSSID(_ ssid: String) -> String { "<network>" }
     var task: Task<Void, Never>?
     var watchdogProcess: Process?
     var displayTimer: Timer?
+    var awakeActivity: NSObjectProtocol?
     var networkTask: Task<Void, Never>?
     init(directory: URL, mode: String) { self.directory = directory; self.mode = mode }
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -62,16 +64,21 @@ nonisolated func redactedSSID(_ ssid: String) -> String { "<network>" }
     }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         cancelled = true; flow?.cancel(); ble.stopScan(); ble.disconnect(); networkTask?.cancel(); task?.cancel()
+        endAwakeActivity()
         if watchdogProcess != nil { try? Data().write(to: directory.appendingPathComponent("restore.now")) }
         return .terminateNow
     }
     func run() async {
         log("probe: starting \(mode); network changes require a ready recovery watchdog")
+        awakeActivity = ProcessInfo.processInfo.beginActivity(
+            options: [.userInitiated, .idleSystemSleepDisabled], reason: "Avata offline transfer test")
+        defer { if networkTask == nil { endAwakeActivity() } }
+        WiFiService.allowNetworksetupJoin = false
         LocalNetworkPermission.prime()
-        await location.request()
-        guard !cancelled else { return }
         let suppliedHome = try? String(
             contentsOfFile: argument("--return-network-file", fallback: "/nonexistent"), encoding: .utf8)
+        if suppliedHome == nil || mode != "recovery-test" { await location.request() }
+        guard !cancelled else { return }
         let home = WiFiService.currentSSID() ?? suppliedHome
         if let home { probeLog.redact(home) }
         let interface = WiFiService.interfaceName ?? "en0"
@@ -85,8 +92,16 @@ nonisolated func redactedSSID(_ ssid: String) -> String { "<network>" }
             log("recovery test: waiting for independent watchdog to terminate this runner")
             return
         }
-        if mode == "live" && (home == nil || !saved) {
-            log("preflight: stopped; cannot safely restore the current network"); return
+        let proofURL = URL(fileURLWithPath: argument("--recovery-proof-file", fallback: "/nonexistent"))
+        let proof = (try? Data(contentsOf: proofURL)).flatMap { try? JSONDecoder().decode(OfflineRecoveryProof.self, from: $0) }
+        let executableHash =
+            (try? Data(contentsOf: Bundle.main.executableURL!)).map {
+                SHA256.hash(data: $0).map { String(format: "%02x", $0) }.joined()
+            } ?? ""
+        if mode == "live"
+            && !OfflineRecoveryPolicy.canJoin(home: home, saved: saved, proof: proof, executable: executableHash, now: Date())
+        {
+            log("preflight: stopped; a successful recent recovery test for this build and return network is required"); return
         }
         ble.startScan()
         let permissionDeadline = Date().addingTimeInterval(120)
@@ -132,7 +147,10 @@ nonisolated func redactedSSID(_ ssid: String) -> String { "<network>" }
         }
         if mode != "live" { log("pair-only test complete; Wi-Fi unchanged"); f.cancel(); ble.disconnect(); return }
         guard let home, saved, home != ssid else { log("preflight: no distinct saved return network"); return }
-        let recoveryReady = await startWatchdog(home: home, interface: interface, seconds: 120, testOnly: false)
+        let forgetCamera = !(await WiFiService.isSavedNetwork(ssid))
+        let recoveryReady = await startWatchdog(
+            home: home, interface: interface, seconds: 120, testOnly: false,
+            cameraSSID: ssid, forgetCamera: forgetCamera)
         guard recoveryReady else { log("preflight: watchdog did not acknowledge readiness; stopped"); return }
         log("offline: 120-second budget armed; joining aircraft network")
         networkTask = Task {
@@ -176,16 +194,23 @@ nonisolated func redactedSSID(_ ssid: String) -> String { "<network>" }
                 await s.close()
             } catch { log("offline: test ended: \(error.localizedDescription)") }
             flow?.cancel(); ble.disconnect()
+            endAwakeActivity()
             log("offline: finished; independent watchdog restoring internet")
             try? Data().write(to: directory.appendingPathComponent("restore.now"))
         }
     }
-    func startWatchdog(home: String, interface: String, seconds: Double, testOnly: Bool) async -> Bool {
+    func endAwakeActivity() {
+        if let awakeActivity { ProcessInfo.processInfo.endActivity(awakeActivity) }
+        awakeActivity = nil
+    }
+    func startWatchdog(
+        home: String, interface: String, seconds: Double, testOnly: Bool, cameraSSID: String? = nil, forgetCamera: Bool = false
+    ) async -> Bool {
         let bundle = Bundle.main.bundleURL.path
         guard let launched = NSRunningApplication.current.launchDate else { return false }
         let lease = RecoveryLease(
             pid: getpid(), launchDate: launched, bundlePath: bundle, homeSSID: home, interface: interface,
-            deadline: Date().addingTimeInterval(seconds), testOnly: testOnly)
+            deadline: Date().addingTimeInterval(seconds), testOnly: testOnly, cameraSSID: cameraSSID, forgetCamera: forgetCamera)
         do {
             for name in ["watchdog.ready", "restore.now", "recovery.status"] {
                 try? FileManager.default.removeItem(at: directory.appendingPathComponent(name))
@@ -207,6 +232,9 @@ nonisolated func redactedSSID(_ ssid: String) -> String { "<network>" }
 }
 
 let arguments = CommandLine.arguments
+if let i = arguments.firstIndex(of: "--rejoin-home"), arguments.count > i + 1 {
+    exit(rejoinHome(URL(fileURLWithPath: arguments[i + 1])))
+}
 if let i = arguments.firstIndex(of: "--watchdog"), arguments.count > i + 1 {
     watchdog(URL(fileURLWithPath: arguments[i + 1])); exit(0)
 }

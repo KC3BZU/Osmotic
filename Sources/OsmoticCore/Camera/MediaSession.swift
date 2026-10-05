@@ -11,9 +11,13 @@ public protocol MediaSession: AnyObject, Sendable {
     var onLinkRestored: (@Sendable () -> Void)? { get set }
     func connect() async -> CameraSession.ConnectResult
     func nextPage() async -> (files: [CameraFile], moreAvailable: Bool)
+    func loadNextPage() async throws -> (files: [CameraFile], moreAvailable: Bool)
     func close() async
 }
-extension MediaSession { public var failureDescription: String? { nil } }
+extension MediaSession {
+    public var failureDescription: String? { nil }
+    public func loadNextPage() async throws -> (files: [CameraFile], moreAvailable: Bool) { await nextPage() }
+}
 extension CameraSession: MediaSession {}
 
 public enum MediaAddress: Sendable, Hashable {

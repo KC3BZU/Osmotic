@@ -28,13 +28,14 @@ public enum DroneCommands {
 }
 
 public enum DroneSessionError: Error, Sendable, CustomStringConvertible {
-    case unsupportedSession, malformedChallenge, counterExhausted, incompleteManifest, unsupportedManifest
+    case unsupportedSession, malformedChallenge, counterExhausted, incompleteManifest, unsupportedManifest, nonAdvancingPage
     public var description: String {
         switch self {
         case .unsupportedSession: "The aircraft did not complete the experimental QuickTransfer session."
         case .malformedChallenge: "The aircraft sent an unrecognized identity challenge."
         case .counterExhausted: "The experimental session reached its tunnel counter limit. Reconnect."
         case .incompleteManifest: "The aircraft media list was incomplete."
+        case .nonAdvancingPage: "The aircraft repeated a full media page. Older media remains unverified; retry listing."
         case .unsupportedManifest: "The aircraft returned an unrecognized media list format."
         }
     }
