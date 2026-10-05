@@ -1,5 +1,7 @@
 # Protocol (what we use)
 
+Avata fork status and test instructions: [Avata validation](AVATA_TESTING.md). The upstream camera documentation below records its own hardware results.
+
 Full source: the upstream's [`MEDIA_PROTOCOL.md`](https://github.com/KonradIT/osmosis/blob/main/MEDIA_PROTOCOL.md). This is the summary, so you don't have to reread it. Capture control and live view (Live tab): `docs/CONTROL.md`.
 
 ## DUML frame

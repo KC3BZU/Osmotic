@@ -1,5 +1,7 @@
 # Architecture
 
+Avata fork status and test instructions: [Avata validation](AVATA_TESTING.md). The upstream camera documentation below records its own hardware results.
+
 ## Flows
 
 ```

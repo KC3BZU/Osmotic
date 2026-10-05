@@ -1,5 +1,13 @@
 # Changelog
 
+## Avata development branch · 2026-10-05
+
+- Add experimental Avata 2 discovery, DJI Fly pairing, drone UDP session negotiation, strict media listing and indexed original downloads.
+- Isolate fork identity and persisted state; disable the upstream updater and camera controls for drones.
+- Add an AppKit hardware runner, independent recovery watchdog and recovery-proof gate.
+- Guard split manifests, retryable page errors and interrupted-download identity/length checks.
+- See [hardware validation](docs/AVATA_TESTING.md); this is an experimental development branch, with no verified Avata media transfer yet.
+
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions: [SemVer](https://semver.org/). The `.app` build number is the commit count.
 
 ## [Unreleased]

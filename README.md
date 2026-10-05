@@ -2,7 +2,7 @@
 
 This fork adds experimental wireless media transfer for Avata 2. It derives from [Osmotic by smithplus](https://github.com/smithplus/Osmotic) and [Osmosis by Konrad Iturbe](https://github.com/KonradIT/osmosis). The upstream documentation follows below.
 
-Local hardware discovery confirmed Avata 2 model `0x0077` on 2026-10-05. Pairing and downloads are not yet verified. The baseline core suite passed 105 tests in 24 suites. Run fresh core tests with `scripts/test_core.sh`.
+Avata 2 discovery, physical approval and BLE Wi-Fi credentials were verified on 2026-10-05. Actual media downloads remain unverified. The fork passes 129 core tests in 31 suites. See [Avata validation](docs/AVATA_TESTING.md) for stage-by-stage evidence and the autonomous test workflow. Run fresh core tests with `scripts/test_core.sh`.
 
 The fork uses a separate app identity and state, and disables upstream updates. Full app builds need a SwiftUI-capable toolchain; the installed Command Line Tools currently lack its macro plugin.
 
@@ -214,6 +214,6 @@ open build/AvataProbe.app --args --mode pair
 
 Pair mode discovers only Avata 2, requests approval and reads its Wi-Fi credentials. It keeps the Mac on its current network. Hold the aircraft power button for two seconds when the test window requests approval.
 
-Live mode requires a readable, saved return network and a separate recovery watchdog. The watchdog ends the runner before reconnecting the Mac, including after a crash. Each offline run has a 120-second budget. Logs and originals stay in the private run directory, outside Git. If recovery preflight fails, the runner stays online.
+Live mode requires a saved return network, a successful recovery proof from the same executable within the last 30 minutes, and a separate recovery watchdog. The watchdog ends the runner before reconnecting the Mac, including after a crash. Each offline run has a 120-second budget. Logs and originals stay in the private run directory, outside Git. If recovery preflight fails, the runner stays online.
 
 The full SwiftUI app uses a separate drone media session and indexed HTTP originals. Avata compatibility remains experimental. Discovery, approval and BLE credentials have been verified on an Avata 2; media transfer has not yet been verified. The aircraft's selected storage is listed; coverage of both SD and internal storage is unverified.

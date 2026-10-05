@@ -1,5 +1,7 @@
 # Status
 
+Avata fork status and test instructions: [Avata validation](AVATA_TESTING.md). The upstream camera documentation below records its own hardware results.
+
 _Last updated: 2026-09-15 (v0.3.0 released). Two tests with a real Pocket 3: Files (build `776be7d`) and Files + Live (build 25, branch `ui/te-style`). Not yet tested with hardware: Webcam, photo in Photo mode, permissions with the app opened from Finder, first pairing._
 
 ## Next hardware test (in this order)

@@ -1,5 +1,7 @@
 # Osmotic guide
 
+Avata fork status and test instructions: [Avata validation](AVATA_TESTING.md). The upstream camera documentation below records its own hardware results.
+
 Everything the app does, in the order you meet it. Short version: turn the camera on, click Connect, click Download New.
 
 - [Install](#install)
