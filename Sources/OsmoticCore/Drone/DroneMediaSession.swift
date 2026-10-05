@@ -39,7 +39,9 @@ public final class DroneMediaSession: MediaSession, @unchecked Sendable {
         self.deviceIdentity = deviceIdentity
         self.ip = ip; self.model = model; self.log = log; self.pageTimeout = pageTimeout
         tx = DatalinkTransport(port: port, interfaceName: interfaceName, localPort: localPort, log: log)
-        tx.windowModel = .mimo; tx.dropVideo = true
+        // Osmosis drone media acknowledges the previous TX sequence and keeps the control window
+        // at the proposed base. Live-control ACKs can freeze routing on aircraft telemetry.
+        tx.windowModel = .legacy; tx.dropVideo = true
         handshake = DroneSessionHandshake(identity: identity)
         tx.shouldAbort = { [unowned self] in self.isClosed }
         let t = Thread { self.run() }; t.name = "avata-media"; t.start()

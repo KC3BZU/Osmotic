@@ -10,16 +10,21 @@ final class FakeDrone: @unchecked Sendable {
     private var queries = 0
     let splitManifest: Bool
     let openBody: [UInt8]
+    let requirePreviousCommandAck: Bool
     private let socketFD: Int32
     private let lock = NSLock()
     private var stopped = false
     private var released = 0
     private var threadDone = false
     var releases: Int { lock.withLock { released } }
-    init(manifest: [UInt8]?, splitManifest: Bool = false, failAfterFirstPage: Bool = false, openBody: [UInt8] = [5, 1, 4, 1, 0])
+    init(
+        manifest: [UInt8]?, splitManifest: Bool = false, failAfterFirstPage: Bool = false,
+        openBody: [UInt8] = [5, 1, 4, 1, 0], requirePreviousCommandAck: Bool = false
+    )
         throws
     {
         self.openBody = openBody
+        self.requirePreviousCommandAck = requirePreviousCommandAck
         self.failAfterFirstPage = failAfterFirstPage
         self.splitManifest = splitManifest
         self.manifest = manifest
@@ -85,6 +90,8 @@ final class FakeDrone: @unchecked Sendable {
             }
             if p[6] == 0 { send(p); continue }
             guard p[6] == 5, p.count > 20, let m = DjiMessage(frame: Array(p.dropFirst(20))) else { continue }
+            // Drone media routing acknowledges our previous command sequence, not telemetry.
+            if requirePreviousCommandAck && p.u16le(8) != ((p.u16le(4) - 8) & 0xffff) { continue }
             let serial = [UInt8](hex: "000011") + Array("1234567890ABCDEFGHJK".utf8) + [0]
             if let inner = DroneCommands.unwrap(m) {
                 if inner.cmdId == 2, inner.payload == openBody { tunnel(cmd: 8, flags: 0x40, id: 1, body: serial) }

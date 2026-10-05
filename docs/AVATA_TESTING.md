@@ -13,14 +13,14 @@ This development fork derives from [Osmotic](https://github.com/smithplus/Osmoti
 | Aircraft Wi-Fi / HTTP | Passed on Avata 2 | CoreWLAN association, HTTP reachability and route through en0; one intermittent join timeout |
 | UDP transport | Passed on Avata 2 | UDP 9003 handshake and CRC-valid aircraft identity beacons |
 | Media session open | Failed on tested Avata 2 | Both documented Mavic and Mini opens ignored; identity beacons continue without a challenge |
-| DJI Fly reference | User confirmed | Media thumbnails appear on the iPhone; Mac catalogue comparison awaits unlocked Mac |
-| Media listing | Loopback only | Split datagrams, ordering, deduplication, timeout and retryable page failure covered |
+| DJI Fly reference | User confirmed | Media thumbnails appear on the iPhone; closing Fly restored Mac UDP handshake access |
+| Media listing | Failed on tested Avata 2 | After Fly closed, diagnostic query received identity beacons but no catalogue reply; loopback coverage passes |
 | Original photo/video | HTTP fixture only | No Avata original has been downloaded or compared with USB/card |
 | Cancel and resume | HTTP fixture only | Identity, validated totals, ranges and incomplete files covered |
 | SD/internal storage coverage | Unverified | Lists selected storage; no unvalidated storage-selection commands |
 | Full native SwiftUI app | Unverified | Installed Command Line Tools lack SwiftUIMacros.StateMacro |
 
-`./scripts/test_core.sh` passes 131 tests in 31 suites. `./scripts/build_probe.sh` builds and ad-hoc signs the separate AppKit runner. Formatting and syntax checks do not replace full SwiftUI compilation or hardware tests.
+`./scripts/test_core.sh` passes 132 tests in 31 suites. `./scripts/build_probe.sh` builds and ad-hoc signs the separate AppKit runner. Formatting and syntax checks do not replace full SwiftUI compilation or hardware tests.
 
 ## Autonomous test workflow
 
@@ -65,5 +65,7 @@ Live tests on 2026-10-05 passed BLE re-pairing, credentials, Wi-Fi/HTTP and UDP.
 The Mini fallback is sent once after ten seconds without a challenge, with a further five-second limit. Receiving a challenge disables fallback. Its fixture test failed before implementation and passes now. The request formats come from [Osmosis DroneSession at 6992036](https://github.com/KonradIT/osmosis/blob/6992036abc29a01126a728443f1d29a83a7ef467/app/src/main/java/dev/konraditurbe/osmosis/drone/DroneSession.kt).
 
 The runner accepts an explicitly diagnostic `--probe-existing-media` flag for a comparison after DJI Fly has opened the aircraft. It performs the UDP handshake and a read-only catalogue query, without sending identity beacons or session-open requests. Production `connect()` still requires the mutual identity exchange. A valid catalogue in this diagnostic mode proves access to that catalogue, not a successful standalone initialization.
+
+The first comparison while DJI Fly remained connected reached Wi-Fi/HTTP but received no UDP SYN reply. After the user fully closed Fly, the Mac completed the UDP handshake and received the usual identity beacons, but no `0x00/0x27` catalogue response. This supports an exclusive-session hypothesis without proving it. A source comparison then found that this fork used live-control acknowledgements instead of the reference's drone media acknowledgements. The corrected media mode passes a regression that rejects commands with stale routing acknowledgements; hardware validation remains separate.
 
 Keep the Mac unlocked and its lid open for radio/permission checks. The runner prevents display and system idle sleep while the test is active, and releases that assertion when it finishes. This does not change authentication or lock settings. If the Mac was already locked, it must first be unlocked manually.
