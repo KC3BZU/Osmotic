@@ -10,7 +10,8 @@ public struct DroneTransferCollector {
     public init(sequence: Int) { self.sequence = sequence }
     public var isComplete: Bool {
         guard let finalIndex, let total, count != nil, chunks.count == finalIndex + 1,
-              (0...finalIndex).allSatisfy({ chunks[$0] != nil }) else { return false }
+            (0...finalIndex).allSatisfy({ chunks[$0] != nil })
+        else { return false }
         return chunks.values.reduce(0) { $0 + $1.count } == total - 8
     }
     public mutating func receive(_ p: [UInt8]) throws {

@@ -26,10 +26,12 @@ public final class DroneMediaSession: MediaSession, @unchecked Sendable {
     private let pageTimeout: TimeInterval
     private let deviceIdentity: String
 
-    public init(ip: String = "192.168.2.1", model: CameraModel, interfaceName: String?,
-                identity: String = UUID().uuidString, deviceIdentity: String = "", port: UInt16 = 9003,
-                localPort: UInt16? = 9003, pageTimeout: TimeInterval = 10,
-                log: @escaping @Sendable (String) -> Void) {
+    public init(
+        ip: String = "192.168.2.1", model: CameraModel, interfaceName: String?,
+        identity: String = UUID().uuidString, deviceIdentity: String = "", port: UInt16 = 9003,
+        localPort: UInt16? = 9003, pageTimeout: TimeInterval = 10,
+        log: @escaping @Sendable (String) -> Void
+    ) {
         self.deviceIdentity = deviceIdentity
         self.ip = ip; self.model = model; self.log = log; self.pageTimeout = pageTimeout
         tx = DatalinkTransport(port: port, interfaceName: interfaceName, localPort: localPort, log: log)
@@ -57,14 +59,20 @@ public final class DroneMediaSession: MediaSession, @unchecked Sendable {
             while jobs.isEmpty && !closed && !ready { cond.wait() }
             if closed && jobs.isEmpty { tx.close(); exited = true; cond.broadcast(); cond.unlock(); return }
             let job = jobs.isEmpty ? nil : jobs.removeFirst(); cond.unlock()
-            if let job { job() } else {
+            if let job {
+                job()
+            } else {
                 do { _ = try pump(ms: 100) } catch { fail(error); ready = false; onLinkLost?() }
             }
         }
     }
     public func close() async {
-        cond.withLock { closed = true; cond.signal() }
-        await submit { [self] in ready = false; tx.close() }
+        cond.withLock {
+            closed = true; cond.signal()
+        }
+        await submit { [self] in
+            ready = false; tx.close()
+        }
     }
     public func connect() async -> CameraSession.ConnectResult {
         await submit { [self] in
@@ -100,7 +108,9 @@ public final class DroneMediaSession: MediaSession, @unchecked Sendable {
         if !packets.isEmpty {
             lastRX = Date()
             if lost { lost = false; onLinkRestored?() }
-        } else if ready && Date().timeIntervalSince(lastRX) > 5 && !lost { lost = true; onLinkLost?() }
+        } else if ready && Date().timeIntervalSince(lastRX) > 5 && !lost {
+            lost = true; onLinkLost?()
+        }
         for packet in packets {
             // Scan outer frames by CRC, then validate each tunnel's inner frame separately.
             for frame in DumlScanner.frames(in: packet) {
@@ -108,7 +118,9 @@ public final class DroneMediaSession: MediaSession, @unchecked Sendable {
                 if message.cmdSet == 0x51 && message.cmdId == 1 {
                     guard let inner = DroneCommands.unwrap(message) else { continue }
                     for reply in try handshake.receive(inner) { tx.sendDumlRaw(reply, drone: true) }
-                } else if message.cmdSet != 0x51 { messages.append(message) }
+                } else if message.cmdSet != 0x51 {
+                    messages.append(message)
+                }
             }
         }
         tx.sendAck()
@@ -126,7 +138,8 @@ public final class DroneMediaSession: MediaSession, @unchecked Sendable {
     private func readPage() throws -> (files: [CameraFile], moreAvailable: Bool) {
         guard !isClosed else { throw CancellationError() }
         sequence = (sequence + 1) & 0xffff
-        let query = envelope(subtype: 0, length: 33,
+        let query = envelope(
+            subtype: 0, length: 33,
             body: LE.u32(Int(cursor)) + [0x2d, 0, 0x0d, 1, 0] + [UInt8](repeating: 0xff, count: 8) + [0, 1, 0, 0, 0, 0])
         sendList(query)
         defer { if tx.isOpen { sendList(envelope(subtype: 4, length: 14, body: [1, 0, 0, 0])) } }
@@ -141,9 +154,13 @@ public final class DroneMediaSession: MediaSession, @unchecked Sendable {
                 try collector.receive(p)
             }
             if collector.isComplete {
-                let all = try collector.files().map { f in var f = f; f.deviceIdentity = deviceIdentity; return f }
+                let all = try collector.files().map { f in
+                    var f = f; f.deviceIdentity = deviceIdentity; return f
+                }
                 let fresh = all.filter { seen.insert($0.id).inserted }
-                let next = all.last.flatMap { file -> UInt32? in if case .drone(let index, _) = file.address { return index }; return nil }
+                let next = all.last.flatMap { file -> UInt32? in
+                    if case .drone(let index, _) = file.address { return index }; return nil
+                }
                 let advances = next != nil && next != cursor && !fresh.isEmpty
                 if let next, advances { cursor = next }
                 onProgress?(1)

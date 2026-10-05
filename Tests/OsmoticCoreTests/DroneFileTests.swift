@@ -1,11 +1,12 @@
 import Foundation
 import Testing
+
 @testable import OsmoticCore
 
 @Suite struct DroneFileTests {
     @Test func recordDatesAndDeviceNamespace() {
         var a = CameraFile(path: "DJI_0001.JPG", thumbPath: "")
-        a.address = .drone(index: 0xc0640001, segment: 2)
+        a.address = .drone(index: 0xc064_0001, segment: 2)
         a.deviceIdentity = "one"; a.recordCaptureDate = Date(timeIntervalSince1970: 100)
         var b = a; b.deviceIdentity = "two"; b.recordCaptureDate = Date(timeIntervalSince1970: 200)
         #expect(a.id != b.id)

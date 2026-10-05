@@ -282,7 +282,8 @@ final class Totals: @unchecked Sendable {
         try Data([9, 9, 9]).write(to: dest.appendingPathExtension("part"))
         try Data("old identity".utf8).write(to: dest.appendingPathExtension("part.identity"))
         let downloader = FileDownloader(http: CameraHTTP(ip: "127.0.0.1", port: Int(server.port)), log: { _ in })
-        let result = await downloader.download(urlPath: "/v1?file_index=6553601&file_subtype=0&file_seg_subindex=0", to: dest,
+        let result = await downloader.download(
+            urlPath: "/v1?file_index=6553601&file_subtype=0&file_seg_subindex=0", to: dest,
             expectedSize: 1, identity: "new identity", progress: { _ in })
         #expect(result == .saved(dest))
         #expect(try Data(contentsOf: dest) == Data(body))

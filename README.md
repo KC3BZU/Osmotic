@@ -202,3 +202,18 @@ The same list is in the app: **Settings › Credits**.
 ## License
 
 Made by [smithplus](https://smithplus.me). If it saved you a cable, [buy me a coffee](https://buymeacoffee.com/smithplus). [MIT](LICENSE). Osmotic is an independent project, **not affiliated with or endorsed by DJI**. "DJI" and "Osmo" are trademarks of their owners. The screenshots show demo data.
+
+### Local Avata test runner
+
+This fork includes an AppKit runner for Macs whose command-line Swift tools cannot build the SwiftUI app:
+
+```sh
+scripts/build_probe.sh
+open build/AvataProbe.app --args --mode pair
+```
+
+Pair mode discovers only Avata 2, requests approval and reads its Wi-Fi credentials. It keeps the Mac on its current network. Hold the aircraft power button for two seconds when the test window requests approval.
+
+Live mode requires a readable, saved return network and a separate recovery watchdog. The watchdog ends the runner before reconnecting the Mac, including after a crash. Each offline run has a 120-second budget. Logs and originals stay in the private run directory, outside Git. If recovery preflight fails, the runner stays online.
+
+The full SwiftUI app uses a separate drone media session and indexed HTTP originals. Avata compatibility remains experimental. Discovery, approval and BLE credentials have been verified on an Avata 2; media transfer has not yet been verified. The aircraft's selected storage is listed; coverage of both SD and internal storage is unverified.

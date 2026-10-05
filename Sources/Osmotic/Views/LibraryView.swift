@@ -33,6 +33,15 @@ struct LibraryView: View {
         @Bindable var model = model
         VStack(spacing: 0) {
             LibraryTopPlate()
+            if model.target?.model.isDrone == true {
+                Text(
+                    "Avata 2 transfers are experimental. The aircraft lists its selected storage; coverage of both stores is not verified."
+                )
+                .font(.caption)
+                .foregroundStyle(Theme.muted)
+                .padding(.horizontal, Theme.s3)
+                .padding(.bottom, Theme.s3)
+            }
             if model.workspace == .webcam {
                 WebcamView()
             } else if model.workspace == .camera {

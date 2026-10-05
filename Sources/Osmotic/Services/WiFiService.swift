@@ -60,7 +60,7 @@ enum WiFiService {
         let deadline = Date().addingTimeInterval(timeout)
         var attempt = 0
         let ipBefore = ipv4Address(name)
-        log("wifi: joining \"\(ssid)\" on \(name) (password \(password.count) chars, ip before \(ipBefore ?? "none"))")
+        log("wifi: joining aircraft network on \(name)")
 
         /// On the camera's AP — not merely on some network whose router also answers at 192.168.2.1.
         func onCameraNetwork() -> Bool {
@@ -75,7 +75,7 @@ enum WiFiService {
         }
 
         if iface.ssid() == ssid && reachable(name) {
-            log("wifi: already on \(ssid)")
+            log("wifi: already on aircraft network")
             return Joined(interface: name, ip: ipv4Address(name))
         }
         while Date() < deadline {
@@ -90,11 +90,11 @@ enum WiFiService {
                     associated = true
                     log("wifi: CoreWLAN associated (attempt \(attempt))")
                 } catch {
-                    log("wifi: CoreWLAN associate failed: \(error.localizedDescription)")
+                    log("wifi: CoreWLAN association failed")
                 }
             } else {
                 status(String(localized: "Waiting for the \(ssid) network…"))
-                log("wifi: \(ssid) not in scan yet (attempt \(attempt))")
+                log("wifi: aircraft network not in scan yet (attempt \(attempt))")
             }
             try Task.checkCancellation()
             // networksetup needs no scan, so it covers SSIDs the scan hides from us. It takes the password
@@ -102,14 +102,14 @@ enum WiFiService {
             // CoreWLAN has had a few tries (on the Pocket 3 it joins on the first).
             if !associated && attempt >= 4 {
                 let out = runNetworksetup(["-setairportnetwork", name, ssid, password])
-                log("wifi: networksetup join → \(out.isEmpty ? "ok" : out)")
+                log("wifi: networksetup join completed (output \(out.isEmpty ? "empty" : "redacted"))")
             }
             // Wait for DHCP and the camera's web server.
             for _ in 0..<8 {
                 try Task.checkCancellation()
                 if onCameraNetwork() {
                     let ip = ipv4Address(name)
-                    log("wifi: camera reachable at \(cameraIP) (ssid \(iface.ssid() ?? "hidden"), ip \(ip ?? "?"))")
+                    log("wifi: aircraft reachable on \(name)")
                     checkRoute(expected: name)
                     return Joined(interface: name, ip: ip)
                 }
@@ -126,7 +126,7 @@ enum WiFiService {
             let nets = try iface.scanForNetworks(withName: ssid)
             return nets.first { $0.ssid == ssid && !$0.supportsSecurity(.none) }
         } catch {
-            log("wifi: scan failed: \(error.localizedDescription)")
+            log("wifi: scan failed")
             return nil
         }
     }
@@ -175,7 +175,7 @@ enum WiFiService {
         // had already saved (their own, if the camera lied) must survive.
         if forgetCamera, let cameraSSID, !cameraSSID.isEmpty {
             let out = runNetworksetup(["-removepreferredwirelessnetwork", name, cameraSSID])
-            log("wifi: forget \(cameraSSID) → \(out.isEmpty ? "ok" : out)")
+            log("wifi: forget temporary aircraft network (output \(out.isEmpty ? "empty" : "redacted"))")
         }
         // networksetup echoes the network's name in its errors ("Failed to join network X."): the log
         // must not carry the user's SSID.

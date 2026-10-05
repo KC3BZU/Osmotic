@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+
 @testable import OsmoticCore
 
 final class FakeDrone: @unchecked Sendable {
@@ -17,10 +18,14 @@ final class FakeDrone: @unchecked Sendable {
         self.socketFD = socketFD
         var address = sockaddr_in(); address.sin_family = sa_family_t(AF_INET)
         inet_pton(AF_INET, "127.0.0.1", &address.sin_addr)
-        let result = withUnsafePointer(to: &address) { $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { bind(socketFD, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) } }
+        let result = withUnsafePointer(to: &address) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { bind(socketFD, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) }
+        }
         guard result == 0 else { Darwin.close(socketFD); throw DatalinkError.bind(errno) }
         var len = socklen_t(MemoryLayout<sockaddr_in>.size)
-        withUnsafeMutablePointer(to: &address) { $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { _ = getsockname(socketFD, $0, &len) } }
+        withUnsafeMutablePointer(to: &address) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { _ = getsockname(socketFD, $0, &len) }
+        }
         port = UInt16(bigEndian: address.sin_port)
         var tv = timeval(tv_sec: 0, tv_usec: 50_000)
         setsockopt(socketFD, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
@@ -36,11 +41,23 @@ final class FakeDrone: @unchecked Sendable {
         var buffer = [UInt8](repeating: 0, count: 4096)
         while !lock.withLock({ stopped }) {
             var from = sockaddr_in(); var len = socklen_t(MemoryLayout<sockaddr_in>.size)
-            let n = buffer.withUnsafeMutableBytes { b in withUnsafeMutablePointer(to: &from) { $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { recvfrom(socketFD, b.baseAddress, b.count, 0, $0, &len) } } }
+            let n = buffer.withUnsafeMutableBytes { b in
+                withUnsafeMutablePointer(to: &from) {
+                    $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                        recvfrom(socketFD, b.baseAddress, b.count, 0, $0, &len)
+                    }
+                }
+            }
             guard n >= 8 else { continue }
             let p = Array(buffer.prefix(n))
             func send(_ bytes: [UInt8]) {
-                _ = bytes.withUnsafeBytes { b in withUnsafePointer(to: &from) { $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { sendto(socketFD, b.baseAddress, b.count, 0, $0, len) } } }
+                _ = bytes.withUnsafeBytes { b in
+                    withUnsafePointer(to: &from) {
+                        $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                            sendto(socketFD, b.baseAddress, b.count, 0, $0, len)
+                        }
+                    }
+                }
             }
             func reply(_ message: DjiMessage) {
                 let bytes = message.encode()
@@ -64,12 +81,17 @@ final class FakeDrone: @unchecked Sendable {
                 let seq = m.payload.u16le(4)
                 if m.payload[1] == 4 { lock.withLock { released += 1 } }
                 if m.payload[1] == 0 {
-                    reply(.init(target: 0x0201, id: 1, type: 0x270000, payload: [0x4a, 3] + LE.u16(0x100a) + LE.u16(seq) + LE.u32(0)))
+                    reply(
+                        .init(
+                            target: 0x0201, id: 1, type: 0x270000, payload: [0x4a, 3] + LE.u16(0x100a) + LE.u16(seq) + LE.u32(0)))
                 }
                 if m.payload[1] == 2, let manifest {
                     let count = manifest.count / 94
-                    reply(.init(target: 0x0201, id: 1, type: 0x270000,
-                                payload: [0x4a, 1] + LE.u16((18 + manifest.count) | 0x1000) + LE.u16(seq) + LE.u32(0) + LE.u32(count) + LE.u32(8 + manifest.count) + manifest))
+                    reply(
+                        .init(
+                            target: 0x0201, id: 1, type: 0x270000,
+                            payload: [0x4a, 1] + LE.u16((18 + manifest.count) | 0x1000) + LE.u16(seq) + LE.u32(0) + LE.u32(count)
+                                + LE.u32(8 + manifest.count) + manifest))
                 }
             }
         }

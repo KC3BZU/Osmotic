@@ -53,6 +53,7 @@ extension AppModel {
         connectTask?.cancel()
         // Stop a datalink handshake now rather than after its ~14 s of retries (close is idempotent).
         if let s = session { Task { await s.close() } }
+        flow?.cancel()
         failPending(CancellationError())
         passwordPromptSSID = nil
         needsApproval = false
@@ -110,23 +111,29 @@ extension AppModel {
             stage = .datalink
             stageDetail = String(localized: "Reading the camera’s card…")
             let s = makeSession(model: t.model, interface: joined.interface)
-            s.onProgress = { p in Task { @MainActor [weak self] in self?.datalinkProgress = p } }
+            s.onProgress = { [weak s] p in
+                Task { @MainActor [weak self] in if let s, self?.session === s { self?.datalinkProgress = p } }
+            }
             session = s  // owned from here on: teardown closes it on any exit
             let result = await s.connect()
             try live()
             guard result.handshakeOk else {
                 throw ConnectError.message(
-                    String(
-                        localized:
-                            "The camera didn’t answer on the data link. If macOS asked about local network access, allow it and try again."
-                    ))
+                    s.failureDescription
+                        ?? String(
+                            localized:
+                                "The camera didn’t answer on the data link. If macOS asked about local network access, allow it and try again."
+                        ))
             }
 
             // 4. Library.
             stage = .library
             stageDetail =
                 result.files.isEmpty ? String(localized: "The card is empty") : String(localized: "\(result.files.count) files")
-            let resolved = await http.resolveStorage(result.files, singleSdStorage: result.model.singleSdStorage)
+            let resolved =
+                result.model.isDrone
+                ? result.files.newestFirst()
+                : await http.resolveStorage(result.files, singleSdStorage: result.model.singleSdStorage)
             try live()
             files = resolved
             moreAvailable = result.moreAvailable
@@ -144,16 +151,23 @@ extension AppModel {
             if superseded {
                 log("connect: attempt ended (cancelled) — cleaning up")
             } else {
-                log("connect: FAILED — \(error.localizedDescription)")
+                log("connect: failed; details shown in the app")
                 connectError = error.localizedDescription
             }
             await cleanup(restoreWifi: true)
         }
     }
 
-    func makeSession(model: CameraModel, interface: String) -> CameraSession {
-        let s = CameraSession(model: model, interfaceName: interface, log: { log($0) })
-        s.onStatus = { st in Task { @MainActor [weak self] in self?.status = st } }
+    func makeSession(model: CameraModel, interface: String) -> any MediaSession {
+        let s: any MediaSession
+        if model.isDrone {
+            s = DroneMediaSession(
+                model: model, interfaceName: interface,
+                identity: Preferences.pairingIdentifier, deviceIdentity: target?.id.uuidString ?? "unknown", log: { log($0) })
+        } else {
+            s = CameraSession(model: model, interfaceName: interface, log: { log($0) })
+        }
+        s.onStatus = { [weak s] st in Task { @MainActor [weak self] in if let s, self?.session === s { self?.status = st } } }
         // Weak: the session keeps these closures, and they must not keep the session (one leak per connect).
         s.onLinkLost = { [weak s] in
             Task { @MainActor [weak self] in if let s { self?.handleLinkLost(from: s) } }

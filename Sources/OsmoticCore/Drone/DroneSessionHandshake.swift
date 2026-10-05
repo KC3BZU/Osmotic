@@ -31,11 +31,13 @@ public final class DroneSessionHandshake {
 
     public func identityBeacon() throws -> DjiMessage {
         // Captured format, with our own installation identity, counter and monotonic uptime.
-        var body = [UInt8](hex: "0004020037386565383937622d643231392d343964642d000401040000000000000100000101018d01000084dc22000000e00c00000000")
+        var body = [UInt8](
+            hex: "0004020037386565383937622d643231392d343964642d000401040000000000000100000101018d01000084dc22000000e00c00000000")
         body.replaceSubrange(4..<23, with: identity + [UInt8](repeating: 0, count: max(0, 19 - identity.count)))
         identityCounter += 1
         body.replaceSubrange(39..<43, with: LE.u32(identityCounter))
-        body.replaceSubrange(43..<47, with: LE.u32(Int((DispatchTime.now().uptimeNanoseconds - started) / 1_000_000) & 0xffffffff))
+        body.replaceSubrange(
+            43..<47, with: LE.u32(Int((DispatchTime.now().uptimeNanoseconds - started) / 1_000_000) & 0xffff_ffff))
         return try wrap(cmd: 0x13, flags: 0, id: 0x7c, body: body)
     }
 
@@ -52,8 +54,10 @@ public final class DroneSessionHandshake {
                 throw DroneSessionError.malformedChallenge
             }
             serial = body; seen.insert(key)
-            return [try wrap(cmd: 8, flags: 0xc0, id: message.id, body: body),
-                    try wrap(cmd: 6, flags: 0x40, id: 0x7d, body: [4, 2, 0] + identity + [0] + body)]
+            return [
+                try wrap(cmd: 8, flags: 0xc0, id: message.id, body: body),
+                try wrap(cmd: 6, flags: 0x40, id: 0x7d, body: [4, 2, 0] + identity + [0] + body),
+            ]
         }
         if message.cmdId == 6, let serial {
             guard DroneCommands.serialBody(in: message.payload) == serial else { throw DroneSessionError.malformedChallenge }

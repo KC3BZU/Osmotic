@@ -55,7 +55,8 @@ public final class FileDownloader: NSObject, URLSessionDataDelegate, @unchecked 
         var lastReport = Date.distantPast
 
         init(
-            handle: FileHandle, rangeStart: Int, requiresTotal: Bool, progress: @escaping (Int) -> Void, onTotal: ((Int) -> Void)?,
+            handle: FileHandle, rangeStart: Int, requiresTotal: Bool, progress: @escaping (Int) -> Void,
+            onTotal: ((Int) -> Void)?,
             done: @escaping (Attempt) -> Void
         ) {
             self.requiresTotal = requiresTotal
@@ -122,8 +123,9 @@ public final class FileDownloader: NSObject, URLSessionDataDelegate, @unchecked 
             }
             let saved = (try? Data(contentsOf: metadata)).flatMap { String(data: $0, encoding: .utf8) }
             if saved != identity { try? fm.removeItem(at: part) }
-            do { try Data(identity.utf8).write(to: metadata, options: .atomic) }
-            catch { return .failed("could not save the download identity") }
+            do { try Data(identity.utf8).write(to: metadata, options: .atomic) } catch {
+                return .failed("could not save the download identity")
+            }
         }
         if !fm.fileExists(atPath: part.path) { fm.createFile(atPath: part.path, contents: nil) }
 
@@ -152,7 +154,8 @@ public final class FileDownloader: NSObject, URLSessionDataDelegate, @unchecked 
         while true {
             if Task.isCancelled { return .cancelled }
             let offset = partSize()
-            let outcome = await fetch(urlPath: urlPath, into: part, from: offset, requiresTotal: identity != nil, onTotal: onTotal, progress: progress)
+            let outcome = await fetch(
+                urlPath: urlPath, into: part, from: offset, requiresTotal: identity != nil, onTotal: onTotal, progress: progress)
             if Task.isCancelled { return .cancelled }
             if identity != nil {
                 let total: Int?
@@ -161,7 +164,9 @@ public final class FileDownloader: NSObject, URLSessionDataDelegate, @unchecked 
                 default: total = nil
                 }
                 if let total {
-                    if let declaredTotal, declaredTotal != total { return .failed("aircraft changed the file length during download") }
+                    if let declaredTotal, declaredTotal != total {
+                        return .failed("aircraft changed the file length during download")
+                    }
                     declaredTotal = total
                 }
             }
@@ -225,7 +230,9 @@ public final class FileDownloader: NSObject, URLSessionDataDelegate, @unchecked 
         let task = session.dataTask(with: req)
         return await withTaskCancellationHandler {
             await withCheckedContinuation { (cont: CheckedContinuation<Attempt, Never>) in
-                let state = TaskState(handle: handle, rangeStart: offset, requiresTotal: requiresTotal, progress: progress, onTotal: onTotal) { outcome in
+                let state = TaskState(
+                    handle: handle, rangeStart: offset, requiresTotal: requiresTotal, progress: progress, onTotal: onTotal
+                ) { outcome in
                     try? handle.close()
                     cont.resume(returning: outcome)
                 }
@@ -266,7 +273,9 @@ public final class FileDownloader: NSObject, URLSessionDataDelegate, @unchecked 
             return
         }
         // The camera serves files, never web pages: an HTML answer is some other device at this address.
-        if let type = http?.value(forHTTPHeaderField: "Content-Type"), (type.lowercased().hasPrefix("text/") || type.lowercased().contains("json")) {
+        if let type = http?.value(forHTTPHeaderField: "Content-Type"),
+            type.lowercased().hasPrefix("text/") || type.lowercased().contains("json")
+        {
             st.outcome = .failed(-3)
             completionHandler(.cancel)
             return
@@ -278,10 +287,11 @@ public final class FileDownloader: NSObject, URLSessionDataDelegate, @unchecked 
         }
         if code == 206 {
             guard let value = http?.value(forHTTPHeaderField: "Content-Range"),
-                  let match = value.wholeMatch(of: /bytes (\d+)-(\d+)\/(\d+)/),
-                  Int(match.1) == st.rangeStart, let end = Int(match.2), let total = Int(match.3),
-                  end >= st.rangeStart, end < total, total <= CameraHTTP.maxFileSize,
-                  response.expectedContentLength == Int64(end - st.rangeStart + 1) else {
+                let match = value.wholeMatch(of: /bytes (\d+)-(\d+)\/(\d+)/),
+                Int(match.1) == st.rangeStart, let end = Int(match.2), let total = Int(match.3),
+                end >= st.rangeStart, end < total, total <= CameraHTTP.maxFileSize,
+                response.expectedContentLength == Int64(end - st.rangeStart + 1)
+            else {
                 st.outcome = .failed(-4); completionHandler(.cancel); return
             }
         }

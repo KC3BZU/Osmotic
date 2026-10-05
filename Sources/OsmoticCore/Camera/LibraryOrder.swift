@@ -6,7 +6,9 @@ extension Array where Element == CameraFile {
     /// that tie on both (names without a stamp) keep the order they come in.
     public func newestFirst() -> [CameraFile] {
         sorted {
-            if $0.recordCaptureDate != nil || $1.recordCaptureDate != nil { return ($0.captureDate ?? .distantPast) > ($1.captureDate ?? .distantPast) }
+            if $0.recordCaptureDate != nil || $1.recordCaptureDate != nil {
+                return ($0.captureDate ?? .distantPast) > ($1.captureDate ?? .distantPast)
+            }
             return $0.timestamp != $1.timestamp ? $0.timestamp > $1.timestamp : $0.seq > $1.seq
         }
     }
@@ -15,7 +17,9 @@ extension Array where Element == CameraFile {
     /// Ties again keep the order they come in.
     public func oldestFirst() -> [CameraFile] {
         sorted {
-            if $0.recordCaptureDate != nil || $1.recordCaptureDate != nil { return ($0.captureDate ?? .distantPast) < ($1.captureDate ?? .distantPast) }
+            if $0.recordCaptureDate != nil || $1.recordCaptureDate != nil {
+                return ($0.captureDate ?? .distantPast) < ($1.captureDate ?? .distantPast)
+            }
             return $0.timestamp != $1.timestamp ? $0.timestamp < $1.timestamp : $0.seq < $1.seq
         }
     }

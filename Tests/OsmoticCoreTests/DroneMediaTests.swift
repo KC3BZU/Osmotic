@@ -1,11 +1,13 @@
 import Foundation
 import Testing
+
 @testable import OsmoticCore
 
 @Suite struct DroneMediaTests {
     func chunk(seq: Int = 9, index: Int, final: Bool, body: [UInt8], count: Int = 1, total: Int = 102) -> [UInt8] {
         let extra = index == 0 ? LE.u32(count) + LE.u32(total) : []
-        return [0x4a, 1] + LE.u16(10 + extra.count + body.count | (final ? 0x1000 : 0)) + LE.u16(seq) + LE.u32(index) + extra + body
+        return [0x4a, 1] + LE.u16(10 + extra.count + body.count | (final ? 0x1000 : 0)) + LE.u16(seq) + LE.u32(index) + extra
+            + body
     }
     func record(stride: Int = 94) -> [UInt8] {
         var r = [UInt8](repeating: 0, count: stride)
@@ -48,7 +50,7 @@ import Testing
         #expect(try c.files().isEmpty)
         var d = DroneTransferCollector(sequence: 9)
         try d.receive(chunk(index: 0, final: true, body: record() + record() + record(), count: 3, total: 290))
-        #expect(try d.files().count == 1) // duplicate indices dedup
+        #expect(try d.files().count == 1)  // duplicate indices dedup
         var e = DroneTransferCollector(sequence: 9)
         try e.receive(chunk(index: 0, final: true, body: record(stride: 67), total: 75))
         #expect(try e.files().count == 1)
@@ -56,7 +58,8 @@ import Testing
     @Test func fakeDroneSessionAndRelease() async throws {
         let drone = try FakeDrone(manifest: record())
         defer { drone.stop() }
-        let session = DroneMediaSession(ip: "127.0.0.1", model: CameraModel.resolve(modelId: 0x77, name: ""),
+        let session = DroneMediaSession(
+            ip: "127.0.0.1", model: CameraModel.resolve(modelId: 0x77, name: ""),
             interfaceName: nil, port: drone.port, localPort: nil, pageTimeout: 0.5, log: { _ in })
         let result = await session.connect()
         #expect(result.handshakeOk)
@@ -72,7 +75,8 @@ import Testing
     @Test func fakeTimeoutReleases() async throws {
         let drone = try FakeDrone(manifest: nil)
         defer { drone.stop() }
-        let session = DroneMediaSession(ip: "127.0.0.1", model: CameraModel.resolve(modelId: 0x77, name: ""),
+        let session = DroneMediaSession(
+            ip: "127.0.0.1", model: CameraModel.resolve(modelId: 0x77, name: ""),
             interfaceName: nil, port: drone.port, localPort: nil, pageTimeout: 0.2, log: { _ in })
         let result = await session.connect()
         #expect(!result.handshakeOk)

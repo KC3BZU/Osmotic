@@ -114,7 +114,7 @@ extension AppModel {
 
     // MARK: Link recovery
 
-    func handleLinkLost(from s: CameraSession) {
+    func handleLinkLost(from s: any MediaSession) {
         guard screen == .library, session === s else { return }  // ignore a replaced session's last words
         linkLost = true
         if workspace == .camera {
@@ -134,7 +134,7 @@ extension AppModel {
         recoverTask = Task { await recoverLink() }
     }
 
-    func handleLinkRestored(from s: CameraSession) {
+    func handleLinkRestored(from s: any MediaSession) {
         guard linkLost, session === s else { return }
         linkLost = false
         log("library: camera link restored")
@@ -183,7 +183,10 @@ extension AppModel {
             }
             if result.handshakeOk {
                 linkLost = false
-                let resolved = await http.resolveStorage(result.files, singleSdStorage: result.model.singleSdStorage)
+                let resolved =
+                    result.model.isDrone
+                    ? result.files.newestFirst()
+                    : await http.resolveStorage(result.files, singleSdStorage: result.model.singleSdStorage)
                 guard gen == connectGeneration, session === s else { return }
                 let (merged, fresh) = files.merging(resolved)
                 if !fresh.isEmpty {
@@ -233,7 +236,7 @@ extension AppModel {
             onCamera = reachable && sameAddress
         }
         if onCamera {
-            log("wifi: recovering from an interrupted session on \(cam)")
+            log("wifi: recovering from an interrupted session")
             restoringWifi = true
             let back = await WiFiService.restore(
                 previous: Preferences.pendingRestoreSSID, cameraSSID: cam, cameraSideIP: nil,

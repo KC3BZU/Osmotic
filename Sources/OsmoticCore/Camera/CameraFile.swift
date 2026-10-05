@@ -89,6 +89,12 @@ public struct CameraFile: Sendable, Hashable, Identifiable {
     /// The 14-digit `YYYYMMDDhhmmss` stamp in the name (first `_<14 digits>_`), or "". A plain byte
     /// scan: these run inside every sort comparator and grouping, where a regex cost seconds on a big card.
     public var timestamp: String {
+        if let recordCaptureDate {
+            let c = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute, .second], from: recordCaptureDate)
+            return String(
+                format: "%04d%02d%02d%02d%02d%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0, c.hour ?? 0, c.minute ?? 0,
+                c.second ?? 0)
+        }
         let b = Array(name.utf8)
         guard let i = Self.firstDigitRun(b, length: 14, followedBy: nil) else { return "" }
         return String(decoding: b[i..<(i + 14)], as: UTF8.self)

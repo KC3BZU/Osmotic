@@ -232,7 +232,8 @@ public final class DatalinkTransport {
     /// Explicit addresses for the drone's tunnel. Camera command sequencing stays separate.
     public func sendDumlRaw(_ message: DjiMessage, drone: Bool) {
         cmdCounter += 1
-        let routing = DatalinkHeaders.routingHeader(seq: udpSeq,
+        let routing = DatalinkHeaders.routingHeader(
+            seq: udpSeq,
             peerAck: windowModel == .mimo ? peerAckedTxSeq : nil,
             cmdCounter: cmdCounter, drone: drone)
         sendRaw(pktType: 0x05, payload: routing + message.encode())

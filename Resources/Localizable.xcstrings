@@ -3048,6 +3048,16 @@
           }
         }
       }
+    },
+    "Avata 2 transfers are experimental. The aircraft lists its selected storage; coverage of both stores is not verified.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las transferencias del Avata 2 son experimentales. El dron muestra el almacenamiento seleccionado; todavía no se verificaron los dos almacenamientos."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

@@ -31,7 +31,7 @@ extension AppModel {
     }
 
     private func enterLive() async {
-        guard let s = session else { return }
+        guard let s = session as? CameraSession else { return }
         let gen = connectGeneration
         selection = []
         log("control: entering camera mode")
@@ -48,7 +48,7 @@ extension AppModel {
     /// Back to playback: stop the picture, relist the newest page (clips recorded meanwhile) and let
     /// the paging carry on where it was. If playback can't be restored, recover like a lost link.
     func leaveLive() async {
-        guard let s = session, sessionInControl else { sessionInControl = false; return }
+        guard let s = session as? CameraSession, sessionInControl else { sessionInControl = false; return }
         let gen = connectGeneration
         log("control: back to the card")
         await s.stopLiveView()
@@ -86,7 +86,7 @@ extension AppModel {
             }
         }
         liveRenderer.onNeedsKeyframe = {
-            Task { @MainActor [weak self] in await self?.session?.requestKeyframe() }
+            Task { @MainActor [weak self] in await (self?.session as? CameraSession)?.requestKeyframe() }
         }
         liveRenderer.onDimensions = { size in
             guard size.width > 0, size.height > 0 else { return }
@@ -119,7 +119,7 @@ extension AppModel {
 
     /// The shutter key: start/stop recording in clip modes, one picture in photo modes.
     func pressShutter() {
-        guard workspace == .camera, !controlBusy, let s = session else { return }
+        guard workspace == .camera, !controlBusy, let s = session as? CameraSession else { return }
         let recording = status.recording
         // Only modes whose shutter command is known (the deck); stopping is always allowed.
         guard recording || status.captureMode.map(CaptureMode.deck.contains) ?? true else { return }
@@ -135,7 +135,8 @@ extension AppModel {
     }
 
     func setMode(_ mode: CaptureMode) {
-        guard workspace == .camera, !controlBusy, !status.recording, status.captureMode != mode, let s = session else { return }
+        guard workspace == .camera, !controlBusy, !status.recording, status.captureMode != mode, let s = session as? CameraSession
+        else { return }
         controlBusy = true
         controlError = nil
         Task {

@@ -97,7 +97,9 @@ extension AppModel {
         defer { loadingMore = false }
         let page = await s.nextPage()
         guard session === s else { return 0 }
-        let resolved = await http.resolveStorage(page.files, singleSdStorage: s.model.singleSdStorage)
+        let resolved =
+            s.model.isDrone
+            ? page.files.newestFirst() : await http.resolveStorage(page.files, singleSdStorage: s.model.singleSdStorage)
         guard session === s else { return 0 }  // disconnected (or replaced) while resolving
         let (merged, added) = files.merging(resolved, pageIsOlder: true)
         files = merged

@@ -10,12 +10,15 @@ public enum DroneManifestDecoder {
             let r = Array(bytes[offset..<(offset + stride)])
             let index = UInt32(r.u32le(8)), storage = Int(index >> 30)
             let directory = Int((index >> 16) & 0x3fff), number = Int(index & 0xffff)
-            guard storage <= 1, (100...999).contains(directory), (1...9999).contains(number) else { throw DroneSessionError.unsupportedManifest }
+            guard storage <= 1, (100...999).contains(directory), (1...9999).contains(number) else {
+                throw DroneSessionError.unsupportedManifest
+            }
             if !seen.insert(index).inserted { continue }
             let duration = r.u16le(12)
             let name = String(format: "DJI_%04d.%@", number, duration > 0 ? "MP4" : "JPG")
-            var f = CameraFile(path: "DCIM/DJI_\(directory)/\(name)", thumbPath: "", storage: storage,
-                               sizeBytes: r.u32le(4), durationSec: duration)
+            var f = CameraFile(
+                path: "DCIM/DJI_\(directory)/\(name)", thumbPath: "", storage: storage,
+                sizeBytes: r.u32le(4), durationSec: duration)
             f.address = .drone(index: index, segment: 0)
             f.storageKnown = true
             let fat = r.u32le(0)

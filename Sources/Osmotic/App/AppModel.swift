@@ -147,7 +147,7 @@ final class AppModel {
     @ObservationIgnored let history = DownloadHistory()
     @ObservationIgnored let location = LocationPermission()
     @ObservationIgnored var flow: PairingFlow?
-    @ObservationIgnored var session: CameraSession?
+    @ObservationIgnored var session: (any MediaSession)?
     @ObservationIgnored var connectTask: Task<Void, Never>?
     @ObservationIgnored var transferTask: Task<Void, Never>?
     @ObservationIgnored var queue: [CameraFile] = []
