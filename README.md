@@ -2,7 +2,7 @@
 
 This fork adds experimental wireless media transfer for Avata 2. It derives from [Osmotic by smithplus](https://github.com/smithplus/Osmotic) and [Osmosis by Konrad Iturbe](https://github.com/KonradIT/osmosis). The upstream documentation follows below.
 
-Avata 2 discovery, physical approval and BLE Wi-Fi credentials were verified on 2026-10-05. Actual media downloads remain unverified. The fork passes 129 core tests in 31 suites. See [Avata validation](docs/AVATA_TESTING.md) for stage-by-stage evidence and the autonomous test workflow. Run fresh core tests with `scripts/test_core.sh`.
+Avata 2 discovery, physical approval and BLE Wi-Fi credentials were verified on 2026-10-05. Actual media downloads remain unverified. The fork passes 131 core tests in 31 suites. See [Avata validation](docs/AVATA_TESTING.md) for stage-by-stage evidence and the autonomous test workflow. Run fresh core tests with `scripts/test_core.sh`.
 
 The fork uses a separate app identity and state, and disables upstream updates. Full app builds need a SwiftUI-capable toolchain; the installed Command Line Tools currently lack its macro plugin.
 

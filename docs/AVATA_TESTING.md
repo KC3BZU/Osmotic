@@ -10,15 +10,17 @@ This development fork derives from [Osmotic](https://github.com/smithplus/Osmoti
 | Physical approval | Passed on Avata 2 | DJI Fly pairing request, aircraft power-button approval |
 | BLE Wi-Fi credentials | Passed on Avata 2 | SSID/password received; secrets excluded from logs and Git |
 | Automatic internet restoration | Passed smoke test | Watchdog terminated runner, fallback cycled Wi-Fi, HTTPS verified through en0 |
-| Aircraft Wi-Fi association | Untested | Gated on a successful recent recovery proof |
-| UDP and drone session | Loopback only | Drone profile binds UDP 9003; no legacy TCP poke |
+| Aircraft Wi-Fi / HTTP | Passed on Avata 2 | CoreWLAN association, HTTP reachability and route through en0; one intermittent join timeout |
+| UDP transport | Passed on Avata 2 | UDP 9003 handshake and CRC-valid aircraft identity beacons |
+| Media session open | Failed on tested Avata 2 | Both documented Mavic and Mini opens ignored; identity beacons continue without a challenge |
+| DJI Fly reference | User confirmed | Media thumbnails appear on the iPhone; Mac catalogue comparison awaits unlocked Mac |
 | Media listing | Loopback only | Split datagrams, ordering, deduplication, timeout and retryable page failure covered |
 | Original photo/video | HTTP fixture only | No Avata original has been downloaded or compared with USB/card |
 | Cancel and resume | HTTP fixture only | Identity, validated totals, ranges and incomplete files covered |
 | SD/internal storage coverage | Unverified | Lists selected storage; no unvalidated storage-selection commands |
 | Full native SwiftUI app | Unverified | Installed Command Line Tools lack SwiftUIMacros.StateMacro |
 
-`./scripts/test_core.sh` passes 129 tests in 31 suites. `./scripts/build_probe.sh` builds and ad-hoc signs the separate AppKit runner. Formatting and syntax checks do not replace full SwiftUI compilation or hardware tests.
+`./scripts/test_core.sh` passes 131 tests in 31 suites. `./scripts/build_probe.sh` builds and ad-hoc signs the separate AppKit runner. Formatting and syntax checks do not replace full SwiftUI compilation or hardware tests.
 
 ## Autonomous test workflow
 
@@ -52,6 +54,16 @@ Review `report.log`, `recovery.status` and downloaded originals locally. Compare
 
 ## Protocol limits
 
-The implemented path uses the persisted installation identity, the DJI Fly BLE token, UDP 9003, the drone session tunnel and indexed `/v1` HTTP originals. The manifest decoder accepts only documented 67-byte and 94-byte record layouts. Unknown layouts and unsupported session stages fail explicitly. Raw FAT capture timestamps stabilize download identity across calendar and timezone changes.
+The normal implemented path uses the persisted installation identity, the DJI Fly BLE token, UDP 9003, the drone session tunnel and indexed `/v1` HTTP originals. The manifest decoder accepts only documented 67-byte and 94-byte record layouts. Unknown layouts and unsupported session stages fail explicitly. Raw FAT capture timestamps stabilize download identity across calendar and timezone changes.
 
 The drone transport currently stops at tunnel-counter exhaustion rather than guessing wrap behavior. Listing failures preserve pagination and surface an error; they never announce that the entire library is complete. Resume metadata binds a partial file to its device, storage, DCF index, capture timestamp and validated server total. A conflicting response discards the partial instead of promoting it to an original.
+
+## Current session blocker
+
+Live tests on 2026-10-05 passed BLE re-pairing, credentials, Wi-Fi/HTTP and UDP. The Avata emits 137-byte transport-type-1 datagrams containing an outer `0x51/0x01` and inner `0x51/0x13` beacon. It sends no challenge to either the Mavic open or the separately documented Mini open. Both waits terminate explicitly; automatic internet restoration passed after each session failure.
+
+The Mini fallback is sent once after ten seconds without a challenge, with a further five-second limit. Receiving a challenge disables fallback. Its fixture test failed before implementation and passes now. The request formats come from [Osmosis DroneSession at 6992036](https://github.com/KonradIT/osmosis/blob/6992036abc29a01126a728443f1d29a83a7ef467/app/src/main/java/dev/konraditurbe/osmosis/drone/DroneSession.kt).
+
+The runner accepts an explicitly diagnostic `--probe-existing-media` flag for a comparison after DJI Fly has opened the aircraft. It performs the UDP handshake and a read-only catalogue query, without sending identity beacons or session-open requests. Production `connect()` still requires the mutual identity exchange. A valid catalogue in this diagnostic mode proves access to that catalogue, not a successful standalone initialization.
+
+Keep the Mac unlocked and its lid open for radio/permission checks. The runner prevents display and system idle sleep while the test is active, and releases that assertion when it finishes. This does not change authentication or lock settings. If the Mac was already locked, it must first be unlocked manually.

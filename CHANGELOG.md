@@ -6,6 +6,8 @@
 - Isolate fork identity and persisted state; disable the upstream updater and camera controls for drones.
 - Add an AppKit hardware runner, independent recovery watchdog and recovery-proof gate.
 - Guard split manifests, retryable page errors and interrupted-download identity/length checks.
+- Add bounded, documented Mini-open fallback and a diagnostic catalogue comparison path; the tested Avata ignores both known opens.
+- Verify real Avata Wi-Fi/HTTP, UDP transport and automatic recovery.
 - See [hardware validation](docs/AVATA_TESTING.md); this is an experimental development branch, with no verified Avata media transfer yet.
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions: [SemVer](https://semver.org/). The `.app` build number is the commit count.
