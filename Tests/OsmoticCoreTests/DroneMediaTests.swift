@@ -73,6 +73,28 @@ import Testing
         try await Task.sleep(for: .milliseconds(80))
         #expect(drone.releases == 2)
     }
+    @Test func documentedMiniOpenFallback() async throws {
+        let drone = try FakeDrone(manifest: record(), openBody: [5, 0xff, 4, 2, 0])
+        defer { drone.stop() }
+        let session = DroneMediaSession(
+            ip: "127.0.0.1", model: CameraModel.resolve(modelId: 0x77, name: ""),
+            interfaceName: nil, port: drone.port, localPort: nil, pageTimeout: 0.5, log: { _ in })
+        let result = await session.connect()
+        await session.close()
+        #expect(result.handshakeOk)
+        #expect(result.files.count == 1)
+    }
+    @Test func diagnosticListCanTestAnAlreadyOpenAircraft() async throws {
+        let drone = try FakeDrone(manifest: record(), openBody: [0])
+        defer { drone.stop() }
+        let session = DroneMediaSession(
+            ip: "127.0.0.1", model: CameraModel.resolve(modelId: 0x77, name: ""),
+            interfaceName: nil, port: drone.port, localPort: nil, pageTimeout: 0.5, log: { _ in })
+        let result = await session.probeExistingMediaList()
+        await session.close()
+        #expect(result.handshakeOk)
+        #expect(result.files.count == 1)
+    }
     @Test func fakeTimeoutReleases() async throws {
         let drone = try FakeDrone(manifest: nil)
         defer { drone.stop() }

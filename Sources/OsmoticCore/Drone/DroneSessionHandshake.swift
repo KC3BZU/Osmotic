@@ -5,6 +5,7 @@ public final class DroneSessionHandshake {
     public private(set) var isUnlocked = false
     private let identity: [UInt8]
     private var serial: [UInt8]?
+    private var triedAlternateOpen = false
     private var receivedResponse = false
     private var answeredRequest = false
     private var counter = 0
@@ -43,6 +44,14 @@ public final class DroneSessionHandshake {
 
     public func begin() throws -> [DjiMessage] {
         [try identityBeacon(), try wrap(cmd: 2, flags: 0x40, id: 0x7c, body: [5, 1, 4, 1, 0])]
+    }
+
+    /// Captured Mini 3 open, tried once only if the first open has not elicited a challenge.
+    /// A challenge makes its variant authoritative; never send another variant after that.
+    public func alternateOpen() throws -> DjiMessage? {
+        guard serial == nil, !triedAlternateOpen else { return nil }
+        triedAlternateOpen = true
+        return try wrap(cmd: 2, flags: 0x40, id: 0x7c, body: [5, 0xff, 4, 2, 0])
     }
 
     public func receive(_ message: DjiMessage) throws -> [DjiMessage] {

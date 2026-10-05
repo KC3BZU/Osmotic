@@ -21,6 +21,9 @@ public final class DroneMediaSession: MediaSession, @unchecked Sendable {
     private var cursor: UInt32 = 1
     private var seen: Set<String> = []
     private var replyStream = DumlFrameAccumulator()
+    private var loggedPacketKinds: Set<String> = []
+    private var loggedMessageKinds: Set<String> = []
+    private var sendIdentityBeacons = true
     private var lastBeacon = Date.distantPast
     private var lastRX = Date()
     private var lost = false
@@ -76,17 +79,41 @@ public final class DroneMediaSession: MediaSession, @unchecked Sendable {
         }
     }
     public func connect() async -> CameraSession.ConnectResult {
+        await connect(requireIdentity: true)
+    }
+    /// Diagnostic only: test the catalogue on an aircraft already opened by DJI Fly.
+    /// Valid media proves catalogue access, never a completed mutual identity exchange.
+    public func probeExistingMediaList() async -> CameraSession.ConnectResult {
+        await connect(requireIdentity: false)
+    }
+    private func connect(requireIdentity: Bool) async -> CameraSession.ConnectResult {
         await submit { [self] in
             do {
                 guard !isClosed else { throw CancellationError() }
                 try tx.open(ip: ip)
                 guard tx.handshake(attempts: 8) != nil else { throw DroneSessionError.unsupportedSession }
+                log("drone: UDP transport handshake complete")
                 tx.syncSeqToPeerChannel()
-                for frame in try handshake.begin() { tx.sendDumlRaw(frame, drone: true) }
-                lastBeacon = Date()
-                let deadline = Date().addingTimeInterval(10)
-                while !handshake.isUnlocked && !isClosed && Date() < deadline { _ = try pump(ms: 100) }
-                guard handshake.isUnlocked, !isClosed else { throw DroneSessionError.unsupportedSession }
+                sendIdentityBeacons = requireIdentity
+                if requireIdentity {
+                    for frame in try handshake.begin() { tx.sendDumlRaw(frame, drone: true) }
+                    log("drone: identity and session-open sent")
+                    lastBeacon = Date()
+                    var deadline = Date().addingTimeInterval(10)
+                    while !handshake.isUnlocked && !isClosed {
+                        if Date() >= deadline {
+                            guard let alternate = try handshake.alternateOpen() else { break }
+                            tx.sendDumlRaw(alternate, drone: true)
+                            log("drone: first open received no challenge; trying documented Mini open once")
+                            deadline = Date().addingTimeInterval(5)
+                        }
+                        _ = try pump(ms: 100)
+                    }
+                    guard handshake.isUnlocked, !isClosed else { throw DroneSessionError.unsupportedSession }
+                    log("drone: mutual identity exchange complete")
+                } else {
+                    log("drone: diagnostic catalogue query; mutual identity remains unverified")
+                }
                 let page = try readPage()
                 ready = true
                 return .init(handshakeOk: true, files: page.files, moreAvailable: page.moreAvailable, model: model)
@@ -117,6 +144,10 @@ public final class DroneMediaSession: MediaSession, @unchecked Sendable {
             lost = true; onLinkLost?()
         }
         for packet in packets {
+            if packet.count >= 8 {
+                let kind = "type=\(packet[6]), bytes=\(packet.count)"
+                if loggedPacketKinds.insert(kind).inserted { log("drone: received datagram \(kind)") }
+            }
             // Reply DUML is a stream: strip each datagram's 8-byte transport and 12-byte routing
             // headers before reassembly. Telemetry tunnels are independently CRC-checked.
             let decoded: [DjiMessage]
@@ -128,8 +159,14 @@ public final class DroneMediaSession: MediaSession, @unchecked Sendable {
                 }
             }
             for message in decoded {
+                let kind =
+                    "target=\(String(message.target, radix: 16)), set=\(message.cmdSet), command=\(message.cmdId), flags=\(message.flags), bytes=\(message.payload.count)"
+                if loggedMessageKinds.insert(kind).inserted { log("drone: received DUML \(kind)") }
                 if message.cmdSet == 0x51 && message.cmdId == 1 {
-                    guard let inner = DroneCommands.unwrap(message) else { continue }
+                    guard let inner = DroneCommands.unwrap(message) else { log("drone: tunnel framing rejected"); continue }
+                    let innerKind =
+                        "inner target=\(String(inner.target, radix: 16)), command=\(inner.cmdId), flags=\(inner.flags), bytes=\(inner.payload.count)"
+                    if loggedMessageKinds.insert(innerKind).inserted { log("drone: \(innerKind)") }
                     for reply in try handshake.receive(inner) { tx.sendDumlRaw(reply, drone: true) }
                 } else if message.cmdSet != 0x51 {
                     messages.append(message)
@@ -137,7 +174,7 @@ public final class DroneMediaSession: MediaSession, @unchecked Sendable {
             }
         }
         tx.sendAck()
-        if Date().timeIntervalSince(lastBeacon) >= 0.5 {
+        if sendIdentityBeacons && Date().timeIntervalSince(lastBeacon) >= 0.5 {
             tx.sendDumlRaw(try handshake.identityBeacon(), drone: true); lastBeacon = Date()
         }
         return messages

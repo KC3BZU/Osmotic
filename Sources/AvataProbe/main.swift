@@ -71,7 +71,7 @@ nonisolated func redactedSSID(_ ssid: String) -> String { "<network>" }
     func run() async {
         log("probe: starting \(mode); network changes require a ready recovery watchdog")
         awakeActivity = ProcessInfo.processInfo.beginActivity(
-            options: [.userInitiated, .idleSystemSleepDisabled], reason: "Avata offline transfer test")
+            options: [.userInitiated, .idleSystemSleepDisabled, .idleDisplaySleepDisabled], reason: "Avata offline transfer test")
         defer { if networkTask == nil { endAwakeActivity() } }
         WiFiService.allowNetworksetupJoin = false
         LocalNetworkPermission.prime()
@@ -164,7 +164,12 @@ nonisolated func redactedSSID(_ ssid: String) -> String { "<network>" }
                     log: { log($0) })
                 session = s
                 log("drone: negotiating media session")
-                let result = await s.connect()
+                let result: CameraSession.ConnectResult
+                if arguments.contains("--probe-existing-media") {
+                    result = await s.probeExistingMediaList()
+                } else {
+                    result = await s.connect()
+                }
                 if result.handshakeOk {
                     log("library: \(result.files.count) files, more=\(result.moreAvailable)")
                     let http = CameraHTTP(); let dl = FileDownloader(http: http, log: { log($0) })

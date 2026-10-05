@@ -23,6 +23,7 @@ import Testing
         let serial = Array("1234567890ABCDEFGHJK".utf8)
         let challenge = DjiMessage(target: 0xeee9, id: 1, type: 0x085140, payload: [0, 0, 0x11] + serial + [0])
         let replies = try h.receive(challenge)
+        #expect(try h.alternateOpen() == nil)
         #expect(replies.count == 2)
         #expect(DroneCommands.unwrap(replies[0])?.payload == challenge.payload)
         #expect(!h.isUnlocked)
