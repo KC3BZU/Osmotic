@@ -2,7 +2,7 @@
 
 This development fork derives from [Osmotic](https://github.com/smithplus/Osmotic) and [Osmosis](https://github.com/KonradIT/osmosis). It is experimental. Upstream camera hardware results do not establish Avata compatibility.
 
-## Evidence as of 2026-10-05
+## Evidence as of 2026-10-07
 
 | Stage | Result | Evidence or limit |
 | --- | --- | --- |
@@ -12,9 +12,9 @@ This development fork derives from [Osmotic](https://github.com/smithplus/Osmoti
 | Automatic internet restoration | Passed smoke test | Watchdog terminated runner, fallback cycled Wi-Fi, HTTPS verified through en0 |
 | Aircraft Wi-Fi / HTTP | Passed on Avata 2 | CoreWLAN association, HTTP reachability and route through en0; one intermittent join timeout |
 | UDP transport | Passed on Avata 2 | UDP 9003 handshake and CRC-valid aircraft identity beacons |
-| Media session open | Failed on tested Avata 2 | Both documented Mavic and Mini opens ignored; identity beacons continue without a challenge |
+| Media session open | Failed on tested Avata 2 | Both documented Mavic and Mini opens ignored, including with corrected media acknowledgements |
 | DJI Fly reference | User confirmed | Media thumbnails appear on the iPhone; closing Fly restored Mac UDP handshake access |
-| Media listing | Failed on tested Avata 2 | After Fly closed, diagnostic query received identity beacons but no catalogue reply; loopback coverage passes |
+| Media listing | Failed on tested Avata 2 | Diagnostic query with corrected acknowledgements received identity beacons but no catalogue reply |
 | Original photo/video | HTTP fixture only | No Avata original has been downloaded or compared with USB/card |
 | Cancel and resume | HTTP fixture only | Identity, validated totals, ranges and incomplete files covered |
 | SD/internal storage coverage | Unverified | Lists selected storage; no unvalidated storage-selection commands |
@@ -67,5 +67,7 @@ The Mini fallback is sent once after ten seconds without a challenge, with a fur
 The runner accepts an explicitly diagnostic `--probe-existing-media` flag for a comparison after DJI Fly has opened the aircraft. It performs the UDP handshake and a read-only catalogue query, without sending identity beacons or session-open requests. Production `connect()` still requires the mutual identity exchange. A valid catalogue in this diagnostic mode proves access to that catalogue, not a successful standalone initialization.
 
 The first comparison while DJI Fly remained connected reached Wi-Fi/HTTP but received no UDP SYN reply. After the user fully closed Fly, the Mac completed the UDP handshake and received the usual identity beacons, but no `0x00/0x27` catalogue response. This supports an exclusive-session hypothesis without proving it. A source comparison then found that this fork used live-control acknowledgements instead of the reference's drone media acknowledgements. The corrected media mode passes a regression that rejects commands with stale routing acknowledgements; hardware validation remains separate.
+
+Retesting on 2026-10-07 used the identical corrected executable, without another rebuild or permission reset. Recovery, BLE, aircraft Wi-Fi and UDP all passed. The diagnostic catalogue remained unanswered, and both documented session-open requests still timed out. Both live runs restored internet automatically. The next evidence needed is a working Avata-specific DJI Fly exchange. A reference capture has not been obtained.
 
 Keep the Mac unlocked and its lid open for radio/permission checks. The runner prevents display and system idle sleep while the test is active, and releases that assertion when it finishes. This does not change authentication or lock settings. If the Mac was already locked, it must first be unlocked manually.
